@@ -21,7 +21,7 @@ from .util import DATA_DIR, NEWS_TONE_CSV, SENTIMENT_CSV, STATS_CSV, week_start
 MIN_PA_WEEK = 10
 MIN_IP_WEEK = 3.0
 PLAYERS_OUT = DATA_DIR / "analysis_players.csv"
-FANBASES_OUT = DATA_DIR / "analysis_fanbases.csv"
+FANBASES_OUT = DATA_DIR / "analysis_fanbases_partial.csv"
 
 
 def load_perf() -> pd.DataFrame:

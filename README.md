@@ -4,14 +4,9 @@ Personal research CLI correlating fan sentiment (Reddit + news) with MLB player
 performance, and comparing fanbases on how "right" they are about their players.
 
 **Question:** does fan sentiment in week *t* predict a player's performance in
-week *t+1*, beyond what week *t* performance already predicts? For each
-(fanbase, player) we compute a partial correlation of weekly sentiment vs.
-next-week performance, controlling for current-week performance (this control
-is what separates real predictive signal from sentiment merely *reacting* to
-stats). Fanbases are then ranked by their players' average correlation.
-
-- `mean_r > 0` — that fanbase's mood carries predictive signal ("fans are right")
-- `mean_r < 0` — fans overreact; performance mean-reverts against their mood
+week *t+1*, beyond what week *t* performance (and season-to-date form) already predicts?
+Fanbases compared: r/CHICubs, r/redsox, r/baseball (neutral baseline), and `news` (GDELT
+headlines) — each judged only on the tracked players it talks about.
 
 Fanbases compared: r/CHICubs, r/redsox, r/baseball (neutral baseline), and
 `news` (GDELT media tone) — each judged only on the tracked players it talks about.
@@ -30,9 +25,9 @@ Docker alternative: `make docker-build`, then `make docker-run ARGS="rosters"`.
 ```sh
 uv run fansent rosters --season 2026          # Cubs + Red Sox -> data/players.csv
 uv run fansent stats --season 2026            # weekly stats -> data/stats.csv
-# texts.csv + news_tone.csv come from the collectors (see below)
+# texts.csv (+ sidecars) come from the collectors (see below)
 uv run fansent score                          # VADER -> data/sentiment.csv
-uv run fansent correlate                      # -> data/analysis_{players,fanbases}.csv
+uv run fansent correlate --perm-b 1000 --workers 8   # -> data/analysis_{fanbases,units,oaa}.csv
 ```
 
 ## Where the text data comes from
@@ -42,10 +37,14 @@ Reddit and news collection lives in a separate, private companion repo
 `data/players.csv` and writes into `data/`:
 
 - `texts.csv` — `text_id, source, subreddit, date, created_utc, player_id, player_name, text`
-  (one row per text × mentioned player; `date` is the UTC day)
-- `news_tone.csv` — `player_id, player_name, team, date, tone`
+  (one row per text x mentioned player; `date` is the UTC day; `source` is e.g.
+  `reddit_arctic` or `gdelt_headline`; `subreddit` is empty for headlines)
+- `reddit_attribution.csv` (optional) — `text_id, player_id, attribution, parent_id`;
+  `attribution` is `explicit` or `reply_inherited` (player named in the parent comment)
+- `news_headlines.csv` (optional) — `text_id, player_id, url, domain, attribution, seendate`
 
-Anything that produces CSVs with those columns can feed `score` / `correlate`.
+A missing sidecar means every mention counts as explicit. `fansent score` turns `texts.csv`
+into `sentiment.csv` (VADER compound per text x player).
 
 ## Data sources
 
@@ -53,14 +52,60 @@ Anything that produces CSVs with those columns can feed `score` / `correlate`.
 - **Reddit** (via `fansent-collect`) — fan comments; personal, non-commercial research.
 - **GDELT DOC 2.0** (via `fansent-collect`) — news per player; free, no key.
 
+## Method (`fansent correlate`)
+
+Per metric (OPS, AVG, ERA, WHIP, FLD_PCT, ERRORS, CS_PCT, and a COMPOSITE index):
+
+1. **Panel.** Fanbase = subreddit for Reddit, `news` for `gdelt_headline`. Per (fanbase,
+   player, Mon-Sun week): weighted mean VADER compound and mention count. Each row at week *t*
+   carries `perf` = metric at *t*, `std` = season-to-date metric through *t*, `sent` at *t*,
+   `y_next` = metric at *t+1* (consecutive weeks required) and `weight` = the sample size at
+   *t+1*. Raw values are kept with `higher_is_better`; the sign is flipped only when fitting, so
+   every effect reads "positive = better performance".
+2. **Model.** `fansent.hierarchical`: `y_next = alpha_unit + b1*perf + b2*std + gamma_unit*sent`,
+   unit = (fanbase, player), `gamma_unit ~ N(mu_fanbase, tau_fanbase^2)`; Gibbs sampler written
+   from scratch. `mu_k` is the fanbase effect, reported in sd of next-week performance per sd of
+   sentiment (variables are z-scored globally). `p_pos` = posterior P(mu_k > 0).
+3. **Permutation null.** Within each unit sentiment is shuffled across that unit's weeks
+   (y_next, perf, std fixed), the model is refit (light, `store_units=False`), and the posterior
+   mean of each `mu_k` collected; `perm_p = (1 + #{|null| >= |obs|}) / (1 + B)`, two-sided,
+   seeded and independent of worker count. This breaks the sentiment-to-outcome link while
+   preserving each unit's marginals; it also breaks the within-unit sentiment-performance link,
+   so it is a null for "sentiment carries no information", not for "sentiment merely reacts".
+4. **Multiple comparisons** across all (metric x fanbase) tests in the run: Benjamini-Hochberg
+   `q_bh` and Holm `p_holm` (both hand-implemented; `--correction` picks which one the `*`
+   marker in the printed table uses, default BH).
+5. **COMPOSITE.** Per metric, oriented values are z-scored pooled over eligible player-weeks;
+   a player-week's composite is the weighted mean of the z-scores available that week
+   (hitters: OPS, AVG, FLD_PCT, -ERRORS; pitchers: ERA, WHIP; equal weights, configurable in
+   `PanelConfig.composite_weights`). Its season-to-date control is built the same way from
+   `std_value`. Role = hitter if the player ever reached 20 PA, else pitcher. A week needs a
+   hitting/pitching metric, so fielding alone never forms a composite. The composite has no
+   sample-size weight.
+6. **OAA check.** Monthly mean sentiment vs next-month Outs Above Average (consecutive months),
+   controlling current-month OAA and cumulative season OAA, through the same model and
+   permutation, weighted by next-month attempts. Monthly data gives ~5 points per unit, too few
+   for per-unit partial correlations, so the hierarchical pooling is used instead.
+
+Defaults, all unconfirmed assumptions rather than tuned values: weekly minimum sample
+OPS/AVG 10 (PA/AB), ERA/WHIP 3 IP, FLD_PCT/ERRORS 3 chances, CS_PCT 2 attempts; >= 3 mentions
+per player-week; >= 8 weeks per unit; >= 3 units per (metric, fanbase); `reply_inherited`
+mentions weigh the same as explicit ones (`--reply-weight`); OAA months need >= 10 mentions,
+>= 10 attempts, >= 3 months per unit.
+
+Outputs: `analysis_fanbases.csv` (`metric, fanbase, mu_mean, ci_low, ci_high, p_pos, perm_p,
+q_bh, p_holm, n_units, n_obs, rhat_max`), `analysis_units.csv` (per-unit shrunk effects),
+`analysis_oaa.csv` / `analysis_oaa_units.csv`. `--method partial` runs the legacy per-pair
+partial correlation (OPS/ERA only, `analysis_players.csv`, `analysis_fanbases_partial.csv`) for
+comparison; it does not use the model, permutation test or corrections.
+
 ## Notes & caveats
 
 - Name matching: full name always; bare last name only when unique among
   tracked players (≥4 chars). Common-word last names can still false-positive.
-- Weekly windows are Mon–Sun (regular season only). `analyze.py` still uses OPS/ERA and drops
-  player-weeks below 10 PA / 3 IP.
-- Weekly OPS/ERA is extremely noisy — expect small correlations; the
-  cross-fanbase *comparison* is the robust readout, not any single player's r.
+- Weekly windows are Mon–Sun (regular season only).
+- Weekly OPS/ERA is extremely noisy — expect small effects; the pooled fanbase effects
+  `mu_k` are the robust readout, not any single unit's `gamma`.
 
 ## Data schema (model contract)
 

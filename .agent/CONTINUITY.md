@@ -24,8 +24,8 @@
 - 2026-10-01T00:00Z [CODE] Split collectors into private fansent-collect; public initial commit has no collector code in history. Branch chore/repo-norms: Apache-2.0 LICENSE, uv.lock committed, numpy explicit, CI (ruff check/format, pytest, pip-audit), CLAUDE.md, CHANGELOG.md, ruff format applied.
 - 2026-10-01T00:00Z [CODE] Branch feat/hierarchical: hierarchical.py (Gibbs + ASIS, half-Cauchy tau via parameter expansion), diagnostics.py, model_data.py, tests/test_hierarchical.py. Not wired to CLI.
 - 2026-10-01T00:00Z [CODE] feat/data-v2: stats.csv now tidy long (OPS/AVG/ERA/WHIP/fielding + std_value, weight), stats_counts.csv, OAA monthly loader; schema documented in README.
+- 2026-10-02T00:00Z [CODE] Branch feat/inference (merged feat/data-v2 + feat/hierarchical): panel.py, composite.py, inference.py, multitest.py, correlate.py; CLI `correlate` runs model + permutation null + BH/Holm; `--method partial` keeps legacy path. Thresholds, composite weights, reply_inherited weight=1 are unconfirmed assumptions (README Method).
 
-## [DISCOVERIES]
 - 2026-10-01T00:00Z [TOOL] pip-audit flagged urllib3 2.7.0 (PYSEC-2026-4175/4176/4177) -> lock bumped to 2.8.0.
 - 2026-10-01T00:00Z [USER] Known bug to fix: fansent-collect reddit-dump --since/--until parse dates as local time while rows are UTC.
 - 2026-08-18T00:00Z [TOOL] GDELT rate-limits ~1 req/5s per IP (429 otherwise) — collector uses 5.5s pause + backoff retry.
