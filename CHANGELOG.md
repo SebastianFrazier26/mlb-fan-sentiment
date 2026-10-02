@@ -2,6 +2,10 @@
 
 ## 2026-10-01
 
+- Added hierarchical Bayesian sentiment model (`fansent.hierarchical`), hand-built in
+  numpy/scipy and fit by vectorized multi-chain Gibbs sampling with an ASIS step; own
+  split-R-hat / bulk-ESS in `fansent.diagnostics`; `fansent.model_data` adapts a panel
+  DataFrame to the model's arrays. Not yet wired into the CLI; `analyze.py` unchanged.
 - Split data collectors (`reddit-dump`, `reddit-live`, `news`) into the private
   `fansent-collect` repo; `fansent` keeps `rosters`, `stats`, `score`, `correlate`
   and consumes the collectors' `texts.csv` / `news_tone.csv`.

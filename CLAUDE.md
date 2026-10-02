@@ -18,6 +18,7 @@ progress; read at session start, update on meaningful deltas).
 - `src/fansent/rosters.py`, `stats.py` — MLB Stats API -> `players.csv`, weekly `stats.csv`
 - `src/fansent/sentiment.py` — VADER over `texts.csv` -> `sentiment.csv`
 - `src/fansent/analyze.py` — lagged partial correlations, fanbase comparison
+- `src/fansent/hierarchical.py` — Gibbs-sampled hierarchical model (`fit` -> `FitResult`); `diagnostics.py` (split-R-hat, bulk ESS); `model_data.py` (panel -> arrays)
 - `src/fansent/names.py`, `util.py` — name matching, paths, CSV I/O (also imported by `fansent-collect`)
 - `tests/` — pytest; `.github/workflows/ci.yml` — lint, format, test, pip-audit
 - `data/` — generated CSVs, gitignored

@@ -22,6 +22,7 @@
 - 2026-08-18T00:00Z [TOOL] Verified: ruff clean, 9/9 pytest pass; live smokes OK (rosters=108 players 2025 fullSeason, stats gameLog->weekly OPS, GDELT timelinetone real data); synthetic end-to-end recovered planted lagged signal (r_partial=0.99), control pitcher correctly excluded.
 - 2026-08-18T00:00Z [TOOL] Full 2025 pulls launched: stats (all 108) and GDELT news tone 2025-03-01..2025-11-15. Docker image NOT built (daemon down) — `make docker-build` untested.
 - 2026-10-01T00:00Z [CODE] Split collectors into private fansent-collect; public initial commit has no collector code in history. Branch chore/repo-norms: Apache-2.0 LICENSE, uv.lock committed, numpy explicit, CI (ruff check/format, pytest, pip-audit), CLAUDE.md, CHANGELOG.md, ruff format applied.
+- 2026-10-01T00:00Z [CODE] Branch feat/hierarchical: hierarchical.py (Gibbs + ASIS, half-Cauchy tau via parameter expansion), diagnostics.py, model_data.py, tests/test_hierarchical.py. Not wired to CLI.
 
 ## [DISCOVERIES]
 - 2026-10-01T00:00Z [TOOL] pip-audit flagged urllib3 2.7.0 (PYSEC-2026-4175/4176/4177) -> lock bumped to 2.8.0.
