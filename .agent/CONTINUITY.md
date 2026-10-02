@@ -14,7 +14,7 @@
 - 2026-08-18T00:00Z [ASSUMPTION] Still unconfirmed from the original design: weekly Mon–Sun windows; min 10 PA / 3 IP per week; min 3 mentions/week; min 8 weeks per (fanbase, player).
 - 2026-10-01T00:00Z [USER] News = GDELT artlist headlines scored with VADER (replaces GDELT timelinetone).
 - 2026-08-18T00:00Z [TOOL] Docker daemon not running on host -> dev via uv venv; Dockerfile + Make targets provided for the container path.
-- 2026-10-01T00:00Z [USER] Season default = most recent (2026). (CLI `--season` defaults still say 2025 — not yet changed.)
+- 2026-10-01T00:00Z [USER] Season default = most recent (2026). (CLI defaults changed to 2026 on feat/data-v2.)
 - 2026-10-01T00:00Z [USER] Repo public (Apache-2.0); collectors (reddit_dump, reddit_live, news_gdelt) moved to private repo `fansent-collect` (~/Developer/fansent-collect), which depends on `fansent` via uv editable path source and writes texts.csv / news_tone.csv into ../mlb-fan-sentiment/data (override: --data-dir / FANSENT_DATA_DIR).
 
 ## [PROGRESS]
@@ -22,6 +22,7 @@
 - 2026-08-18T00:00Z [TOOL] Verified: ruff clean, 9/9 pytest pass; live smokes OK (rosters=108 players 2025 fullSeason, stats gameLog->weekly OPS, GDELT timelinetone real data); synthetic end-to-end recovered planted lagged signal (r_partial=0.99), control pitcher correctly excluded.
 - 2026-08-18T00:00Z [TOOL] Full 2025 pulls launched: stats (all 108) and GDELT news tone 2025-03-01..2025-11-15. Docker image NOT built (daemon down) — `make docker-build` untested.
 - 2026-10-01T00:00Z [CODE] Split collectors into private fansent-collect; public initial commit has no collector code in history. Branch chore/repo-norms: Apache-2.0 LICENSE, uv.lock committed, numpy explicit, CI (ruff check/format, pytest, pip-audit), CLAUDE.md, CHANGELOG.md, ruff format applied.
+- 2026-10-01T00:00Z [CODE] feat/data-v2: stats.csv now tidy long (OPS/AVG/ERA/WHIP/fielding + std_value, weight), stats_counts.csv, OAA monthly loader; schema documented in README.
 
 ## [DISCOVERIES]
 - 2026-10-01T00:00Z [TOOL] pip-audit flagged urllib3 2.7.0 (PYSEC-2026-4175/4176/4177) -> lock bumped to 2.8.0.

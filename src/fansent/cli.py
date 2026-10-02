@@ -13,14 +13,19 @@ def main() -> None:
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("rosters", help="Fetch Cubs + Red Sox rosters into players.csv")
-    p.add_argument("--season", type=int, default=2025)
+    p.add_argument("--season", type=int, default=2026)
     p.add_argument(
         "--roster-type", default="fullSeason", help="MLB API rosterType (fullSeason, active, 40Man)"
     )
 
     p = sub.add_parser("stats", help="Pull game logs, aggregate to weekly stats.csv")
-    p.add_argument("--season", type=int, default=2025)
+    p.add_argument("--season", type=int, default=2026)
     p.add_argument("--limit", type=int, help="Only first N players (smoke testing)")
+
+    p = sub.add_parser(
+        "oaa", help="Load a Baseball Savant monthly OAA CSV export into oaa_monthly.csv"
+    )
+    p.add_argument("path", help="Path to the Savant Outs Above Average CSV export")
 
     sub.add_parser("score", help="VADER-score texts.csv (from fansent-collect) into sentiment.csv")
 
@@ -42,6 +47,10 @@ def main() -> None:
         from . import stats
 
         stats.run(args.season, args.limit)
+    elif args.command == "oaa":
+        from . import oaa
+
+        oaa.run(args.path)
     elif args.command == "score":
         from . import sentiment
 
