@@ -47,15 +47,24 @@ def test_no_substring_false_positive():
 
 
 def _hit_split(date, **stat):
-    base = {"atBats": 4, "hits": 1, "baseOnBalls": 0, "hitByPitch": 0, "sacFlies": 0,
-            "totalBases": 1, "plateAppearances": 4}
+    base = {
+        "atBats": 4,
+        "hits": 1,
+        "baseOnBalls": 0,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 1,
+        "plateAppearances": 4,
+    }
     base.update(stat)
     return {"date": date, "stat": base}
 
 
 def test_weekly_hitting_ops():
-    splits = [_hit_split("2025-07-14", hits=2, totalBases=5),
-              _hit_split("2025-07-15", hits=1, totalBases=1)]
+    splits = [
+        _hit_split("2025-07-14", hits=2, totalBases=5),
+        _hit_split("2025-07-15", hits=1, totalBases=1),
+    ]
     weeks = weekly_hitting(splits)
     assert len(weeks) == 1
     w = weeks[0]

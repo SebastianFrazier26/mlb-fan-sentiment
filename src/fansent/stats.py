@@ -49,8 +49,15 @@ def weekly_hitting(splits: list[dict]) -> list[dict]:
         w = weeks.setdefault(week_start(d), defaultdict(float))
         st = s["stat"]
         w["games"] += 1
-        for k in ("atBats", "hits", "baseOnBalls", "hitByPitch", "sacFlies", "totalBases",
-                  "plateAppearances"):
+        for k in (
+            "atBats",
+            "hits",
+            "baseOnBalls",
+            "hitByPitch",
+            "sacFlies",
+            "totalBases",
+            "plateAppearances",
+        ):
             w[k] += int(st.get(k, 0) or 0)
     out = []
     for wk, w in sorted(weeks.items()):
@@ -111,8 +118,15 @@ def run(season: int, limit: int | None = None, pause: float = 0.3) -> None:
         splits = fetch_game_log(int(p["player_id"]), season, group)
         weekly = weekly_pitching(splits) if pitcher else weekly_hitting(splits)
         for w in weekly:
-            rows.append({"player_id": p["player_id"], "full_name": p["full_name"],
-                         "team": p["team"], "season": season, **w})
+            rows.append(
+                {
+                    "player_id": p["player_id"],
+                    "full_name": p["full_name"],
+                    "team": p["team"],
+                    "season": season,
+                    **w,
+                }
+            )
         print(f"[{i}/{len(players)}] {p['full_name']}: {len(weekly)} weeks")
         time.sleep(pause)
     n = write_csv(STATS_CSV, rows, FIELDS)

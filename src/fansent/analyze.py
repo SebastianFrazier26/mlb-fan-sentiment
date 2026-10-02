@@ -94,8 +94,7 @@ def run(min_weeks: int = 8, min_mentions: int = 3) -> None:
     for (fanbase, pid), g in panel.groupby(["fanbase", "player_id"]):
         if len(g) < min_weeks:
             continue
-        result = partial_corr(g["sent"].to_numpy(), g["perf_next"].to_numpy(),
-                              g["perf"].to_numpy())
+        result = partial_corr(g["sent"].to_numpy(), g["perf_next"].to_numpy(), g["perf"].to_numpy())
         if result is None:
             continue
         player_rows.append(

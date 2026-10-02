@@ -14,8 +14,9 @@ def main() -> None:
 
     p = sub.add_parser("rosters", help="Fetch Cubs + Red Sox rosters into players.csv")
     p.add_argument("--season", type=int, default=2025)
-    p.add_argument("--roster-type", default="fullSeason",
-                   help="MLB API rosterType (fullSeason, active, 40Man)")
+    p.add_argument(
+        "--roster-type", default="fullSeason", help="MLB API rosterType (fullSeason, active, 40Man)"
+    )
 
     p = sub.add_parser("stats", help="Pull game logs, aggregate to weekly stats.csv")
     p.add_argument("--season", type=int, default=2025)
@@ -24,24 +25,30 @@ def main() -> None:
     sub.add_parser("score", help="VADER-score texts.csv (from fansent-collect) into sentiment.csv")
 
     p = sub.add_parser("correlate", help="Lagged partial correlations + fanbase comparison")
-    p.add_argument("--min-weeks", type=int, default=8,
-                   help="Min usable weeks per (fanbase, player)")
-    p.add_argument("--min-mentions", type=int, default=3,
-                   help="Min Reddit mentions for a player-week to count")
+    p.add_argument(
+        "--min-weeks", type=int, default=8, help="Min usable weeks per (fanbase, player)"
+    )
+    p.add_argument(
+        "--min-mentions", type=int, default=3, help="Min Reddit mentions for a player-week to count"
+    )
 
     args = parser.parse_args()
 
     if args.command == "rosters":
         from . import rosters
+
         rosters.run(args.season, args.roster_type)
     elif args.command == "stats":
         from . import stats
+
         stats.run(args.season, args.limit)
     elif args.command == "score":
         from . import sentiment
+
         sentiment.run()
     elif args.command == "correlate":
         from . import analyze
+
         analyze.run(args.min_weeks, args.min_mentions)
 
 
