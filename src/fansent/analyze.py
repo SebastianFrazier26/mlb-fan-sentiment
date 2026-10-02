@@ -26,10 +26,11 @@ FANBASES_OUT = DATA_DIR / "analysis_fanbases.csv"
 
 def load_perf() -> pd.DataFrame:
     df = pd.read_csv(STATS_CSV)
+    df = df[df["metric"].isin(["OPS", "ERA"])]
     df["week_start"] = pd.to_datetime(df["week_start"])
     # Orient so higher == better for every player (ERA gets negated).
     df["perf"] = np.where(df["higher_is_better"], df["value"], -df["value"])
-    ok = np.where(df["metric"] == "OPS", df["sample"] >= MIN_PA_WEEK, df["sample"] >= MIN_IP_WEEK)
+    ok = np.where(df["metric"] == "OPS", df["weight"] >= MIN_PA_WEEK, df["weight"] >= MIN_IP_WEEK)
     return df[ok][["player_id", "full_name", "team", "week_start", "perf"]]
 
 
