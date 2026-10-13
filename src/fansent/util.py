@@ -10,6 +10,8 @@ DATA_DIR = Path("data")
 
 PLAYERS_CSV = DATA_DIR / "players.csv"
 STATS_CSV = DATA_DIR / "stats.csv"
+STATS_COUNTS_CSV = DATA_DIR / "stats_counts.csv"
+OAA_CSV = DATA_DIR / "oaa_monthly.csv"
 TEXTS_CSV = DATA_DIR / "texts.csv"
 SENTIMENT_CSV = DATA_DIR / "sentiment.csv"
 NEWS_TONE_CSV = DATA_DIR / "news_tone.csv"
@@ -26,6 +28,12 @@ def parse_ip(ip: str) -> float:
         return 0.0
     whole, _, frac = str(ip).partition(".")
     return int(whole or 0) + int(frac or 0) / 3.0
+
+
+def ip_to_outs(ip: str) -> int:
+    """Exact outs from an innings-pitched string ('5.2' -> 17); avoids float thirds."""
+    whole, _, frac = str(ip or "0").partition(".")
+    return int(whole or 0) * 3 + int(frac or 0)
 
 
 def write_csv(path: Path, rows: list[dict], fieldnames: list[str], append: bool = False) -> int:

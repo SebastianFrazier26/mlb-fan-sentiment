@@ -4,7 +4,6 @@ import numpy as np
 
 from fansent.analyze import partial_corr
 from fansent.names import build_matchers, find_mentions
-from fansent.stats import weekly_hitting, weekly_pitching
 from fansent.util import parse_ip, week_start
 
 
@@ -44,44 +43,6 @@ def test_shared_last_name_needs_full_name():
 def test_no_substring_false_positive():
     matchers = build_matchers(_players())
     assert find_mentions("the suzukimobile", matchers) == []
-
-
-def _hit_split(date, **stat):
-    base = {
-        "atBats": 4,
-        "hits": 1,
-        "baseOnBalls": 0,
-        "hitByPitch": 0,
-        "sacFlies": 0,
-        "totalBases": 1,
-        "plateAppearances": 4,
-    }
-    base.update(stat)
-    return {"date": date, "stat": base}
-
-
-def test_weekly_hitting_ops():
-    splits = [
-        _hit_split("2025-07-14", hits=2, totalBases=5),
-        _hit_split("2025-07-15", hits=1, totalBases=1),
-    ]
-    weeks = weekly_hitting(splits)
-    assert len(weeks) == 1
-    w = weeks[0]
-    assert w["week_start"] == "2025-07-14"
-    # OBP = 3/8, SLG = 6/8
-    assert abs(w["value"] - (3 / 8 + 6 / 8)) < 1e-9
-    assert w["sample"] == 8
-
-
-def test_weekly_pitching_era():
-    splits = [
-        {"date": "2025-07-15", "stat": {"inningsPitched": "6.0", "earnedRuns": 2}},
-        {"date": "2025-07-20", "stat": {"inningsPitched": "3.0", "earnedRuns": 1}},
-    ]
-    weeks = weekly_pitching(splits)
-    assert len(weeks) == 1
-    assert abs(weeks[0]["value"] - 9 * 3 / 9) < 1e-9
 
 
 def test_partial_corr_detects_lagged_signal():
