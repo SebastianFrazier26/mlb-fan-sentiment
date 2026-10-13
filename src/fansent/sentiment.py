@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
-from .util import SENTIMENT_CSV, TEXTS_CSV, read_csv, write_csv
+from .util import DEFAULT_DATA_DIR, SENTIMENT_FILE, TEXTS_FILE, read_csv, write_csv
 
 FIELDS = ["text_id", "source", "subreddit", "date", "player_id", "player_name", "compound"]
 
 
-def run() -> None:
-    texts = read_csv(TEXTS_CSV)
+def run(data_dir: Path = DEFAULT_DATA_DIR) -> None:
+    texts = read_csv(data_dir / TEXTS_FILE)
     analyzer = SentimentIntensityAnalyzer()
     rows = []
     for t in texts:
@@ -26,5 +28,6 @@ def run() -> None:
                 "compound": round(score["compound"], 4),
             }
         )
-    n = write_csv(SENTIMENT_CSV, rows, FIELDS)
-    print(f"Scored {n} texts -> {SENTIMENT_CSV}")
+    out = data_dir / SENTIMENT_FILE
+    n = write_csv(out, rows, FIELDS)
+    print(f"Scored {n} texts -> {out}")

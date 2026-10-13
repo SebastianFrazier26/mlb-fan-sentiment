@@ -13,7 +13,7 @@ import csv
 import datetime as dt
 from pathlib import Path
 
-from .util import OAA_CSV, write_csv
+from .util import DEFAULT_DATA_DIR, OAA_FILE, write_csv
 
 FIELDS = ["player_id", "full_name", "month", "oaa", "attempts", "fielding_runs_prevented"]
 MONTH_COLUMNS = ("month", "game_month", "date", "game_date", "start_date")
@@ -76,7 +76,8 @@ def load_oaa(path: Path | str) -> list[dict]:
     return sorted(agg.values(), key=lambda r: (r["month"], r["player_id"]))
 
 
-def run(path: str) -> None:
+def run(path: str, data_dir: Path = DEFAULT_DATA_DIR) -> None:
     rows = load_oaa(path)
-    n = write_csv(OAA_CSV, rows, FIELDS)
-    print(f"Wrote {n} player-months to {OAA_CSV}")
+    out = data_dir / OAA_FILE
+    n = write_csv(out, rows, FIELDS)
+    print(f"Wrote {n} player-months to {out}")

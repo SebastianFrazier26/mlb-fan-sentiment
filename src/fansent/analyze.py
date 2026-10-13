@@ -11,21 +11,28 @@ their mood. Per-fanbase scores aggregate player r values via Fisher z.
 from __future__ import annotations
 
 import math
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 from scipy import stats as sps
 
-from .util import DATA_DIR, NEWS_TONE_CSV, SENTIMENT_CSV, STATS_CSV, week_start
+from .util import (
+    DEFAULT_DATA_DIR,
+    NEWS_TONE_FILE,
+    SENTIMENT_FILE,
+    STATS_FILE,
+    week_start,
+)
 
 MIN_PA_WEEK = 10
 MIN_IP_WEEK = 3.0
-PLAYERS_OUT = DATA_DIR / "analysis_players.csv"
-FANBASES_OUT = DATA_DIR / "analysis_fanbases_partial.csv"
+PLAYERS_OUT = "analysis_players.csv"
+FANBASES_OUT = "analysis_fanbases_partial.csv"
 
 
-def load_perf() -> pd.DataFrame:
-    df = pd.read_csv(STATS_CSV)
+def load_perf(data_dir: Path = DEFAULT_DATA_DIR) -> pd.DataFrame:
+    df = pd.read_csv(data_dir / STATS_FILE)
     df = df[df["metric"].isin(["OPS", "ERA"])]
     df["week_start"] = pd.to_datetime(df["week_start"])
     # Orient so higher == better for every player (ERA gets negated).
@@ -34,12 +41,12 @@ def load_perf() -> pd.DataFrame:
     return df[ok][["player_id", "full_name", "team", "week_start", "perf"]]
 
 
-def load_sentiment(min_mentions: int) -> pd.DataFrame:
+def load_sentiment(min_mentions: int, data_dir: Path = DEFAULT_DATA_DIR) -> pd.DataFrame:
     """Weekly mean sentiment per (fanbase, player). Fanbase = subreddit, plus
     a 'news' pseudo-fanbase from GDELT tone if news_tone.csv exists."""
     frames = []
-    if SENTIMENT_CSV.exists():
-        s = pd.read_csv(SENTIMENT_CSV)
+    if (data_dir / SENTIMENT_FILE).exists():
+        s = pd.read_csv(data_dir / SENTIMENT_FILE)
         s["week_start"] = pd.to_datetime(s["date"]).dt.date.map(week_start)
         g = (
             s.groupby(["subreddit", "player_id", "week_start"])["compound"]
@@ -48,8 +55,8 @@ def load_sentiment(min_mentions: int) -> pd.DataFrame:
             .rename(columns={"subreddit": "fanbase"})
         )
         frames.append(g[g["mentions"] >= min_mentions])
-    if NEWS_TONE_CSV.exists():
-        n = pd.read_csv(NEWS_TONE_CSV)
+    if (data_dir / NEWS_TONE_FILE).exists():
+        n = pd.read_csv(data_dir / NEWS_TONE_FILE)
         n["week_start"] = pd.to_datetime(n["date"]).dt.date.map(week_start)
         g = (
             n.groupby(["player_id", "week_start"])["tone"]
@@ -75,9 +82,9 @@ def partial_corr(sent: np.ndarray, perf_next: np.ndarray, perf_now: np.ndarray):
     return sps.pearsonr(res_sent, res_next)
 
 
-def run(min_weeks: int = 8, min_mentions: int = 3) -> None:
-    perf = load_perf()
-    sent = load_sentiment(min_mentions)
+def run(min_weeks: int = 8, min_mentions: int = 3, data_dir: Path = DEFAULT_DATA_DIR) -> None:
+    perf = load_perf(data_dir)
+    sent = load_sentiment(min_mentions, data_dir)
 
     perf_next = perf.copy()
     perf_next["week_start"] -= pd.Timedelta(weeks=1)  # join perf_{t+1} onto week t
@@ -117,7 +124,7 @@ def run(min_weeks: int = 8, min_mentions: int = 3) -> None:
         )
 
     players_df = pd.DataFrame(player_rows).sort_values(["fanbase", "r_partial"], ascending=False)
-    players_df.to_csv(PLAYERS_OUT, index=False)
+    players_df.to_csv(data_dir / PLAYERS_OUT, index=False)
 
     fanbase_rows = []
     for fanbase, g in players_df.groupby("fanbase"):
@@ -132,10 +139,10 @@ def run(min_weeks: int = 8, min_mentions: int = 3) -> None:
             }
         )
     fanbases_df = pd.DataFrame(fanbase_rows).sort_values("mean_r", ascending=False)
-    fanbases_df.to_csv(FANBASES_OUT, index=False)
+    fanbases_df.to_csv(data_dir / FANBASES_OUT, index=False)
 
     print("\n=== Which fanbase is most 'right' about its players? ===")
     print(fanbases_df.to_string(index=False))
-    print(f"\nPer-player detail: {PLAYERS_OUT}")
+    print(f"\nPer-player detail: {data_dir / PLAYERS_OUT}")
     print("mean_r > 0: fan mood adds predictive signal beyond recent stats.")
     print("mean_r < 0: fans overreact; performance mean-reverts against their mood.")
