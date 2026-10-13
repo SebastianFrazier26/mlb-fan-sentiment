@@ -1,0 +1,31 @@
+subreddit,team_id,team,status
+CHICubs,112,Chicago Cubs,verified
+redsox,111,Boston Red Sox,verified
+azdiamondbacks,109,Arizona Diamondbacks,unverified
+Braves,144,Atlanta Braves,unverified
+orioles,110,Baltimore Orioles,unverified
+whitesox,145,Chicago White Sox,unverified
+Reds,113,Cincinnati Reds,unverified
+ClevelandGuardians,114,Cleveland Guardians,unverified
+ColoradoRockies,115,Colorado Rockies,unverified
+motorcitykitties,116,Detroit Tigers,unverified
+Astros,117,Houston Astros,unverified
+KCRoyals,118,Kansas City Royals,unverified
+angelsbaseball,108,Los Angeles Angels,unverified
+Dodgers,119,Los Angeles Dodgers,unverified
+letsgofish,146,Miami Marlins,unverified
+Brewers,158,Milwaukee Brewers,unverified
+minnesotatwins,142,Minnesota Twins,unverified
+NewYorkMets,121,New York Mets,unverified
+NYYankees,147,New York Yankees,unverified
+OaklandAthletics,133,Athletics,unverified
+phillies,143,Philadelphia Phillies,unverified
+buccos,134,Pittsburgh Pirates,unverified
+Padres,135,San Diego Padres,unverified
+SFGiants,137,San Francisco Giants,unverified
+Mariners,136,Seattle Mariners,unverified
+Cardinals,138,St. Louis Cardinals,unverified
+tampabayrays,139,Tampa Bay Rays,unverified
+TexasRangers,140,Texas Rangers,unverified
+Torontobluejays,141,Toronto Blue Jays,unverified
+Nationals,120,Washington Nationals,unverified

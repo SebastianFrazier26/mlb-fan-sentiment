@@ -56,6 +56,11 @@ def main(argv: list[str] | None = None) -> None:
         default=1.0,
         help="Weight of reply_inherited mentions in the weekly mean (1 = same as explicit, 0 = drop)",
     )
+    p.add_argument(
+        "--all-teams",
+        action="store_true",
+        help="Disable the own-team filter: team subreddits count every player (sensitivity check)",
+    )
     p.add_argument("--metrics", nargs="+", help="Subset of metrics (default: all with data)")
     p.add_argument("--no-composite", action="store_true", help="Skip the COMPOSITE index")
     p.add_argument("--oaa", help="OAA monthly CSV (default: <data-dir>/oaa_monthly.csv if present)")
@@ -100,6 +105,7 @@ def main(argv: list[str] | None = None) -> None:
                     min_weeks=args.min_weeks,
                     min_units_per_fanbase=args.min_units,
                     reply_inherited_weight=args.reply_weight,
+                    **({"fanbase_teams": {}} if args.all_teams else {}),
                 ),
                 InferenceConfig(perm_b=args.perm_b, workers=args.workers, seed=args.seed),
                 args.metrics,

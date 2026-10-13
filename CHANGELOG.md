@@ -2,6 +2,12 @@
 
 ## 2026-10-13
 
+- Own-team filter: a team subreddit fanbase counts only its own team's players (roster
+  `team_id` from `players.csv`); `r/baseball`, `news` and unmapped subreddits stay league-wide.
+  Data-driven map in `fansent/team_subreddits.csv` (30 teams, only CHICubs/redsox verified),
+  `PanelConfig.fanbase_teams`, `panel.filter_own_team`, dropped-row counts printed by
+  `correlate`. `fansent correlate --all-teams` restores the old behaviour. This changes
+  results relative to earlier runs.
 - Global `--data-dir DIR` option (before the subcommand) with `FANSENT_DATA_DIR` fallback, then
   `./data` as before. Every subcommand honors it. Breaking for Python importers: `util.DATA_DIR`
   and the `*_CSV` path constants are replaced by `DEFAULT_DATA_DIR`, `resolve_data_dir()` and
