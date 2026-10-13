@@ -30,6 +30,33 @@ uv run fansent score                          # VADER -> data/sentiment.csv
 uv run fansent correlate --perm-b 1000 --workers 8   # -> data/analysis_{fanbases,units,oaa}.csv
 ```
 
+## Sentiment scoring
+
+`fansent score --scorer vader|lexicon|clf [--model data/models/clf.npz]` writes
+`sentiment.csv`; `compound` is the score in [-1, 1] whichever scorer ran, so `correlate`
+is unchanged.
+
+- `vader`: raw VADER (default). Misreads baseball slang (nasty, filthy, killing it) and
+  sentiment aimed at someone other than the named player.
+- `lexicon`: VADER plus a baseball overlay (`src/fansent/classifier/baseball_lexicon.json`,
+  edit freely: words, phrases, emoji, VADER-scale valences).
+- `clf`: own classifier (`src/fansent/classifier/`). The row's player is masked as
+  `__TGT__` and other rostered players as `__OTH__`; features are word 1-2-gram and char
+  3-5-gram TF-IDF plus a block of n-grams within +-k tokens of `__TGT__`; model is L2
+  multinomial logistic regression with balanced class weights, fit by L-BFGS on our own
+  loss/gradient. Score = P(pos) - P(neg).
+
+Labeled CSV schema (`text, player, player_id, final_label` or `draft_label`, optional
+`aliases` as `;`-separated nicknames; `na` rows are excluded from training and evaluation):
+
+```sh
+uv run fansent clf-eval --train a.csv b.csv --test test.csv   # CV-tunes, then VADER vs lexicon vs clf
+uv run fansent clf-train --train a.csv b.csv --out data/models/clf.npz
+uv run fansent score --scorer clf --model data/models/clf.npz
+```
+
+`--players` (default `data/players.csv`) supplies the roster used for `__OTH__` masking.
+
 ## Where the text data comes from
 
 Reddit and news collection lives in a separate, private companion repo

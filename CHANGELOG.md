@@ -2,6 +2,14 @@
 
 ## 2026-10-13
 
+- Target-aware sentiment classifier (`fansent.classifier`, numpy + scipy.sparse, no ML
+  libraries): target/other player masking (`__TGT__`/`__OTH__`), word + char + target-window
+  TF-IDF, L2 multinomial logistic regression (own loss/gradient, L-BFGS driver), class weights.
+  New `fansent clf-eval` (VADER vs VADER+baseball lexicon vs classifier: accuracy, macro-F1,
+  per-class P/R, confusion, Spearman, ECE, grouped k-fold CV tuning) and `fansent clf-train`.
+  `fansent score --scorer vader|lexicon|clf [--model PATH]`; `sentiment.csv` format unchanged
+  (default stays `vader`). Baseball lexicon overlay is data: `classifier/baseball_lexicon.json`.
+
 - First-name-collision guard no longer fires when the following word is ALL CAPS (2+ letters):
   `NICO WTF`, `THE SEIYA SPECIAL` are credited. An all-caps word still blocks when it is a
   tracked surname (`ANTHONY VOLPE` stays uncredited to Roman Anthony); an untracked all-caps

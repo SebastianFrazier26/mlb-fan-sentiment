@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
 
 def main() -> None:
@@ -27,7 +28,35 @@ def main() -> None:
     )
     p.add_argument("path", help="Path to the Savant Outs Above Average CSV export")
 
-    sub.add_parser("score", help="VADER-score texts.csv (from fansent-collect) into sentiment.csv")
+    p = sub.add_parser("score", help="Score texts.csv (from fansent-collect) into sentiment.csv")
+    p.add_argument("--scorer", choices=["vader", "lexicon", "clf"], default="vader")
+    p.add_argument("--model", help="Model .npz from clf-train (required for --scorer clf)")
+
+    def add_grid(p):
+        p.add_argument(
+            "--players", default="data/players.csv", help="Roster CSV for __OTH__ masking"
+        )
+        p.add_argument("--cv", type=int, default=5, help="CV folds for tuning (<2 = no tuning)")
+        p.add_argument("--seed", type=int, default=0)
+        p.add_argument("--Cs", type=float, nargs="+", default=[1.0, 3.0, 10.0, 30.0])
+        p.add_argument(
+            "--windows", type=int, nargs="+", default=[0, 3, 5], help="0 = no window block"
+        )
+        p.add_argument("--char-ngrams", nargs="+", default=["0-0", "3-5"], help="lo-hi; 0-0 = off")
+        p.add_argument("--word-ngrams", nargs="+", default=["1-2"])
+
+    p = sub.add_parser(
+        "clf-eval", help="Train on labeled CSVs, compare vader/lexicon/clf on a test CSV"
+    )
+    p.add_argument("--train", nargs="+", required=True)
+    p.add_argument("--test", required=True)
+    p.add_argument("--save-model", help="Also save the trained model here")
+    add_grid(p)
+
+    p = sub.add_parser("clf-train", help="Train the classifier and save the model artifact")
+    p.add_argument("--train", nargs="+", required=True)
+    p.add_argument("--out", default="data/models/clf.npz")
+    add_grid(p)
 
     p = sub.add_parser(
         "correlate", help="Fanbase effect of sentiment on next-week performance (hierarchical)"
@@ -73,15 +102,26 @@ def main() -> None:
     elif args.command == "score":
         from . import sentiment
 
-        sentiment.run()
+        sentiment.run(args.scorer, Path(args.model) if args.model else None)
+    elif args.command in ("clf-eval", "clf-train"):
+        from .classifier import evaluate
+
+        grid = evaluate.Grid(
+            tuple(args.Cs), tuple(args.windows), tuple(args.char_ngrams), tuple(args.word_ngrams)
+        )
+        train = [Path(t) for t in args.train]
+        players = Path(args.players)
+        if args.command == "clf-eval":
+            save = Path(args.save_model) if args.save_model else None
+            evaluate.run_eval(train, Path(args.test), players, args.cv, grid, args.seed, save)
+        else:
+            evaluate.run_train(train, Path(args.out), players, args.cv, grid, args.seed)
     elif args.command == "correlate":
         if args.method == "partial":
             from . import analyze
 
             analyze.run(args.min_weeks, args.min_mentions)
         else:
-            from pathlib import Path
-
             from . import correlate
             from .inference import InferenceConfig
             from .panel import PanelConfig

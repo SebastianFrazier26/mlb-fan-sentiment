@@ -20,6 +20,8 @@
 - 2026-10-12T00:00Z [USER] Composite weights: hitters OPS 0.375, AVG 0.375, FLD_PCT 0.125, -ERRORS 0.125; pitchers ERA 0.5, WHIP 0.5, no fielding.
 - 2026-10-12T00:00Z [USER] Multiple-comparison families, separate: `metrics` (OPS, AVG, ERA, WHIP, FLD_PCT, ERRORS; BH default, Holm also reported), `COMPOSITE` (headline), `OAA` (secondary); `CS_PCT` exploratory (raw perm_p, no correction). Output has `family`, `exploratory` columns.
 - 2026-10-12T00:00Z [USER] Weekly/mention/week thresholds stay as-is; still unconfirmed assumptions in README.
+- 2026-10-13T00:00Z [USER] Sentiment scorer: own target-aware classifier built from scratch in numpy (masked target/other names, word+char+target-window TF-IDF, L2 multinomial logistic regression, L-BFGS), replacing raw VADER (~39% on draft labels). Baselines kept in the same harness: VADER and VADER + baseball lexicon overlay. Training/eval on real labels deferred until the user adds improvements.
+- 2026-10-13T00:00Z [ASSUMPTION] `na` labels are excluded from training and eval (relevance, not sentiment) rather than a 4th class; revisit if na rows are common in real data.
 
 ## [PROGRESS]
 - 2026-08-18T00:00Z [CODE] Scaffolded ~/Developer/mlb-fan-sentiment: fansent CLI (rosters, stats, reddit-dump, reddit-live, news, score, correlate), tests, Dockerfile, Makefile, README.
@@ -38,3 +40,4 @@
 
 ## [OUTCOMES]
 - 2026-08-18T00:00Z [CODE] MVP pipeline built and verified (unit + synthetic e2e + live smokes). Remaining: user torrents Reddit .zst dumps (baseball/CHICubs/redsox) and runs reddit-dump -> score -> correlate; optional reddit-live creds; top-100 player list; Docker build unverified.
+- 2026-10-13T00:00Z [CODE] Branch feat/classifier: fansent.classifier (text, features, softmax, pipeline, overlay, scorers, evaluate), `clf-eval`/`clf-train`/`score --scorer`, synthetic-only tests. Not run on real labels.
