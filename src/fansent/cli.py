@@ -29,6 +29,11 @@ def main() -> None:
 
     sub.add_parser("score", help="VADER-score texts.csv (from fansent-collect) into sentiment.csv")
 
+    p = sub.add_parser("label", help="Label a sentiment-eval CSV in a local browser page")
+    p.add_argument("--file", required=True, help="CSV with at least id, player, text columns")
+    p.add_argument("--port", type=int, default=8765, help="Port on 127.0.0.1 (0 = any free)")
+    p.add_argument("--open", action="store_true", help="Open the page in the default browser")
+
     p = sub.add_parser(
         "correlate", help="Fanbase effect of sentiment on next-week performance (hierarchical)"
     )
@@ -74,6 +79,10 @@ def main() -> None:
         from . import sentiment
 
         sentiment.run()
+    elif args.command == "label":
+        from . import label
+
+        label.run(args.file, args.port, args.open)
     elif args.command == "correlate":
         if args.method == "partial":
             from . import analyze

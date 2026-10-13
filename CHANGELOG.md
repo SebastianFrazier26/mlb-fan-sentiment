@@ -2,6 +2,13 @@
 
 ## 2026-10-13
 
+- New `fansent label --file <csv> [--port 8765] [--open]`: a local labeling page (stdlib
+  `http.server`, bound to 127.0.0.1, no external assets) for sentiment-eval CSVs. Shows the
+  comment with the player name highlighted, the parent comment for replies, and the draft
+  label preselected; keys `1/2/3/0` = pos/neu/neg/na, `s`/`u` toggle sarcasm/uncertain,
+  Enter/→ accept & next, ← back, "only unreviewed" filter. Each decision is written
+  immediately (`final_label`, `sarcasm`, `uncertain`, `reviewed=1`, `reviewed_at`) via temp
+  file + atomic rename. Requires `id`, `player`, `text` columns; missing output columns are added.
 - First-name-collision guard no longer fires when the following word is ALL CAPS (2+ letters):
   `NICO WTF`, `THE SEIYA SPECIAL` are credited. An all-caps word still blocks when it is a
   tracked surname (`ANTHONY VOLPE` stays uncredited to Roman Anthony); an untracked all-caps

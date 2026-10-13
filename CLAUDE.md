@@ -21,6 +21,7 @@ progress; read at session start, update on meaningful deltas).
 - `src/fansent/panel.py`, `composite.py`, `inference.py`, `multitest.py`, `correlate.py` — panel builder, composite index, fit + permutation null, BH/Holm, `correlate` orchestration
 - `src/fansent/hierarchical.py` — Gibbs-sampled hierarchical model (`fit` -> `FitResult`); `diagnostics.py` (split-R-hat, bulk ESS); `model_data.py` (panel -> arrays)
 - `src/fansent/names.py`, `util.py` — name matching, paths, CSV I/O (also imported by `fansent-collect`)
+- `src/fansent/label.py` — `fansent label`: localhost-only labeling page for eval CSVs (data stays local, gitignored)
 - `tests/` — pytest; `.github/workflows/ci.yml` — lint, format, test, pip-audit
 - `data/` — generated CSVs, gitignored
 
