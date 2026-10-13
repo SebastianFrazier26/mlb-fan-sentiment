@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .util import ENV_VAR, resolve_data_dir
+from .util import ENV_VAR, MODEL_FILE, MODELS_DIR, PLAYERS_FILE, resolve_data_dir
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -36,7 +36,39 @@ def main(argv: list[str] | None = None) -> None:
     )
     p.add_argument("path", help="Path to the Savant Outs Above Average CSV export")
 
-    sub.add_parser("score", help="VADER-score texts.csv (from fansent-collect) into sentiment.csv")
+    p = sub.add_parser("score", help="Score texts.csv (from fansent-collect) into sentiment.csv")
+    p.add_argument("--scorer", choices=["vader", "lexicon", "clf"], default="vader")
+    p.add_argument(
+        "--model",
+        help="Model .npz from clf-train (--scorer clf; default: <data-dir>/models/clf.npz)",
+    )
+
+    def add_grid(p):
+        p.add_argument(
+            "--players",
+            help="Roster CSV for __OTH__ masking (default: <data-dir>/players.csv)",
+        )
+        p.add_argument("--cv", type=int, default=5, help="CV folds for tuning (<2 = no tuning)")
+        p.add_argument("--seed", type=int, default=0)
+        p.add_argument("--Cs", type=float, nargs="+", default=[1.0, 3.0, 10.0, 30.0])
+        p.add_argument(
+            "--windows", type=int, nargs="+", default=[0, 3, 5], help="0 = no window block"
+        )
+        p.add_argument("--char-ngrams", nargs="+", default=["0-0", "3-5"], help="lo-hi; 0-0 = off")
+        p.add_argument("--word-ngrams", nargs="+", default=["1-2"])
+
+    p = sub.add_parser(
+        "clf-eval", help="Train on labeled CSVs, compare vader/lexicon/clf on a test CSV"
+    )
+    p.add_argument("--train", nargs="+", required=True)
+    p.add_argument("--test", required=True)
+    p.add_argument("--save-model", help="Also save the trained model here")
+    add_grid(p)
+
+    p = sub.add_parser("clf-train", help="Train the classifier and save the model artifact")
+    p.add_argument("--train", nargs="+", required=True)
+    p.add_argument("--out", help="Model path (default: <data-dir>/models/clf.npz)")
+    add_grid(p)
 
     p = sub.add_parser(
         "correlate", help="Fanbase effect of sentiment on next-week performance (hierarchical)"
@@ -88,7 +120,21 @@ def main(argv: list[str] | None = None) -> None:
     elif args.command == "score":
         from . import sentiment
 
-        sentiment.run(data_dir)
+        sentiment.run(args.scorer, Path(args.model) if args.model else None, data_dir)
+    elif args.command in ("clf-eval", "clf-train"):
+        from .classifier import evaluate
+
+        grid = evaluate.Grid(
+            tuple(args.Cs), tuple(args.windows), tuple(args.char_ngrams), tuple(args.word_ngrams)
+        )
+        train = [Path(t) for t in args.train]
+        players = Path(args.players) if args.players else data_dir / PLAYERS_FILE
+        if args.command == "clf-eval":
+            save = Path(args.save_model) if args.save_model else None
+            evaluate.run_eval(train, Path(args.test), players, args.cv, grid, args.seed, save)
+        else:
+            out = Path(args.out) if args.out else data_dir / MODELS_DIR / MODEL_FILE
+            evaluate.run_train(train, out, players, args.cv, grid, args.seed)
     elif args.command == "correlate":
         if args.method == "partial":
             from . import analyze

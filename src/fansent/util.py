@@ -18,6 +18,8 @@ OAA_FILE = "oaa_monthly.csv"
 TEXTS_FILE = "texts.csv"
 SENTIMENT_FILE = "sentiment.csv"
 NEWS_TONE_FILE = "news_tone.csv"
+MODELS_DIR = "models"
+MODEL_FILE = "clf.npz"
 
 
 def resolve_data_dir(cli_value: str | None = None) -> Path:

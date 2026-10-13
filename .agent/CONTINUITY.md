@@ -20,6 +20,8 @@
 - 2026-10-12T00:00Z [USER] Composite weights: hitters OPS 0.375, AVG 0.375, FLD_PCT 0.125, -ERRORS 0.125; pitchers ERA 0.5, WHIP 0.5, no fielding.
 - 2026-10-12T00:00Z [USER] Multiple-comparison families, separate: `metrics` (OPS, AVG, ERA, WHIP, FLD_PCT, ERRORS; BH default, Holm also reported), `COMPOSITE` (headline), `OAA` (secondary); `CS_PCT` exploratory (raw perm_p, no correction). Output has `family`, `exploratory` columns.
 - 2026-10-12T00:00Z [USER] Weekly/mention/week thresholds stay as-is; still unconfirmed assumptions in README.
+- 2026-10-13T00:00Z [USER] Sentiment scorer: own target-aware classifier built from scratch in numpy (masked target/other names, word+char+target-window TF-IDF, L2 multinomial logistic regression, L-BFGS), replacing raw VADER (~39% on draft labels). Baselines kept in the same harness: VADER and VADER + baseball lexicon overlay. Training/eval on real labels deferred until the user adds improvements.
+- 2026-10-13T00:00Z [ASSUMPTION] `na` labels are excluded from training and eval (relevance, not sentiment) rather than a 4th class; revisit if na rows are common in real data.
 - 2026-10-13T00:00Z [USER] A team subreddit fanbase counts ONLY its own team's players (r/CHICubs -> Cubs 112, r/redsox -> Red Sox 111; roster `team_id` from players.csv, so traded players leave the old team's sub). r/baseball and news stay league-wide. `--all-teams` disables for sensitivity checks.
 - 2026-10-13T00:00Z [CODE] Unmapped subreddits are treated as league-wide (not an error) so new/non-team sources work; 28 non-demo entries in team_subreddits.csv are unverified recall.
 
@@ -37,6 +39,7 @@
 - 2026-08-18T00:00Z [TOOL] GDELT rate-limits ~1 req/5s per IP (429 otherwise) — collector uses 5.5s pause + backoff retry.
 - 2026-08-18T00:00Z [TOOL] Academic Torrents subreddit dumps cover 2005-06..2025-12, per-subreddit files (top 40k subs) — solves Reddit historical backfill.
 - 2026-08-18T00:00Z [TOOL] Reddit API free tier (100 QPM/OAuth client, non-commercial) confirmed still current as of 2026-08.
+- 2026-10-13T00:00Z [CODE] Branch feat/classifier: fansent.classifier (text, features, softmax, pipeline, overlay, scorers, evaluate), `clf-eval`/`clf-train`/`score --scorer`, synthetic-only tests. Not run on real labels.
 
 ## [OUTCOMES]
 - 2026-08-18T00:00Z [CODE] MVP pipeline built and verified (unit + synthetic e2e + live smokes). Remaining: user torrents Reddit .zst dumps (baseball/CHICubs/redsox) and runs reddit-dump -> score -> correlate; optional reddit-live creds; top-100 player list; Docker build unverified.

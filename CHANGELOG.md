@@ -2,6 +2,14 @@
 
 ## 2026-10-13
 
+- Target-aware sentiment classifier (`fansent.classifier`, numpy + scipy.sparse, no ML
+  libraries): target/other player masking (`__TGT__`/`__OTH__`), word + char + target-window
+  TF-IDF, L2 multinomial logistic regression (own loss/gradient, L-BFGS driver), class weights.
+  New `fansent clf-eval` (VADER vs VADER+baseball lexicon vs classifier: accuracy, macro-F1,
+  per-class P/R, confusion, Spearman, ECE, grouped k-fold CV tuning) and `fansent clf-train`.
+  `fansent score --scorer vader|lexicon|clf [--model PATH]`; `sentiment.csv` format unchanged
+  (default stays `vader`). Baseball lexicon overlay is data: `classifier/baseball_lexicon.json`.
+
 - Own-team filter: a team subreddit fanbase counts only its own team's players (roster
   `team_id` from `players.csv`); `r/baseball`, `news` and unmapped subreddits stay league-wide.
   Data-driven map in `fansent/team_subreddits.csv` (30 teams, only CHICubs/redsox verified),
