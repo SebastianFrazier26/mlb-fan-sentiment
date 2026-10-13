@@ -4,6 +4,7 @@ multiple-comparison correction -> analysis_{fanbases,units,oaa}.csv."""
 from __future__ import annotations
 
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -16,9 +17,10 @@ from .panel import (
     PanelConfig,
     build_oaa_panel,
     build_weekly_panel,
+    filter_own_team,
     sentiment_periods,
 )
-from .util import DATA_DIR, OAA_CSV, SENTIMENT_CSV, STATS_CSV
+from .util import DATA_DIR, OAA_CSV, PLAYERS_CSV, SENTIMENT_CSV, STATS_CSV
 
 FANBASES_OUT = DATA_DIR / "analysis_fanbases.csv"
 UNITS_OUT = DATA_DIR / "analysis_units.csv"
@@ -59,11 +61,17 @@ class Outputs:
     oaa_fanbases: pd.DataFrame
     oaa_units: pd.DataFrame
     skipped: list[str]
+    dropped: dict[str, int]
     seconds: float
 
 
 def _read_optional(path: Path) -> pd.DataFrame | None:
     return pd.read_csv(path, dtype=str) if path.exists() else None
+
+
+def read_player_teams(path: Path = PLAYERS_CSV) -> dict[str, int]:
+    df = pd.read_csv(path, dtype={"player_id": str})
+    return dict(zip(df["player_id"], df["team_id"].astype(int), strict=True))
 
 
 def family_of(metric: str) -> str:
@@ -99,8 +107,10 @@ def analyze(
     icfg: InferenceConfig,
     metrics: list[str] | None = None,
     include_composite: bool = True,
+    player_teams: Mapping[str, int] | None = None,
 ) -> Outputs:
     t0 = time.perf_counter()
+    scores, dropped = filter_own_team(scores, pcfg, player_teams)
     weekly_sent, monthly_sent = sentiment_periods(scores, sidecars, pcfg)
     panel = build_weekly_panel(stats, weekly_sent, pcfg, metrics, include_composite)
     results: list[MetricResult] = []
@@ -130,6 +140,7 @@ def analyze(
         oaa_fanbases=fb[is_oaa].reset_index(drop=True),
         oaa_units=units[units["metric"] == "OAA"].reset_index(drop=True),
         skipped=skipped,
+        dropped=dropped,
         seconds=time.perf_counter() - t0,
     )
 
@@ -170,7 +181,7 @@ def run(
 
     out = analyze(
         stats, scores, [s for s in sidecars if s is not None], oaa, pcfg, icfg, metrics,
-        include_composite,
+        include_composite, read_player_teams(),
     )  # fmt: skip
     out.fanbases.to_csv(FANBASES_OUT, index=False)
     out.units.to_csv(UNITS_OUT, index=False)
@@ -178,6 +189,8 @@ def run(
         out.oaa_units.to_csv(OAA_OUT.with_name("analysis_oaa_units.csv"), index=False)
         out.oaa_fanbases.to_csv(OAA_OUT, index=False)
 
+    if out.dropped:
+        print(f"own-team filter dropped text-player rows: {out.dropped}")
     print(
         f"\n=== Fanbase effect mu_k: sentiment_t -> better performance t+1 ({correction} < {alpha}) ==="
     )

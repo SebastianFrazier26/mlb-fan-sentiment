@@ -2,6 +2,12 @@
 
 ## 2026-10-13
 
+- Own-team filter: a team subreddit fanbase counts only its own team's players (roster
+  `team_id` from `players.csv`); `r/baseball`, `news` and unmapped subreddits stay league-wide.
+  Data-driven map in `fansent/team_subreddits.csv` (30 teams, only CHICubs/redsox verified),
+  `PanelConfig.fanbase_teams`, `panel.filter_own_team`, dropped-row counts printed by
+  `correlate`. `fansent correlate --all-teams` restores the old behaviour. This changes
+  results relative to earlier runs.
 - Surnames that are ordinary English words (`fansent.common_words`, ~600 curated entries) match
   only when Capitalized: `a little rough` / `early innings` / `what a story` no longer credit
   Luke Little / Connelly Early / Trevor Story, while `Little blew the save` does. Full-name

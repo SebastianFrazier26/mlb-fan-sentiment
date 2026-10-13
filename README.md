@@ -56,7 +56,14 @@ into `sentiment.csv` (VADER compound per text x player).
 
 Per metric (OPS, AVG, ERA, WHIP, FLD_PCT, ERRORS, CS_PCT, and a COMPOSITE index):
 
-1. **Panel.** Fanbase = subreddit for Reddit, `news` for `gdelt_headline`. Per (fanbase,
+1. **Panel.** Fanbase = subreddit for Reddit, `news` for `gdelt_headline`. A team subreddit
+   counts only mentions of its own team's players (user decision 2026-10-13): team membership
+   is `team_id` in `players.csv` (current roster, so a traded player leaves his old team's
+   subreddit), and the subreddit-to-team map is the bundled `src/fansent/team_subreddits.csv`
+   (all 30 teams; only CHICubs and redsox are `verified`, the other names are from memory and
+   marked `unverified`). `r/baseball`, `news`, and any subreddit not in the map are league-wide
+   (no filter); rows dropped per fanbase are printed. `--all-teams` (or
+   `PanelConfig(fanbase_teams={})`) disables the filter for sensitivity checks. Per (fanbase,
    player, Mon-Sun week): weighted mean VADER compound and mention count. Each row at week *t*
    carries `perf` = metric at *t*, `std` = season-to-date metric through *t*, `sent` at *t*,
    `y_next` = metric at *t+1* (consecutive weeks required) and `weight` = the sample size at
