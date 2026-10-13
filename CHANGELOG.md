@@ -2,6 +2,12 @@
 
 ## 2026-10-13
 
+- Surnames that are ordinary English words (`fansent.common_words`, ~600 curated entries) match
+  only when Capitalized: `a little rough` / `early innings` / `what a story` no longer credit
+  Luke Little / Connelly Early / Trevor Story, while `Little blew the save` does. Full-name
+  matches stay case-insensitive. ALL-CAPS surname counts unless the whole text has no
+  lowercase letters. Known limitation: a sentence-initial `Early innings` still matches.
+  `name_pattern` takes `capitalized=True` for alias layers.
 - First-name-collision guard no longer fires when the following word is ALL CAPS (2+ letters):
   `NICO WTF`, `THE SEIYA SPECIAL` are credited. An all-caps word still blocks when it is a
   tracked surname (`ANTHONY VOLPE` stays uncredited to Roman Anthony); an untracked all-caps
