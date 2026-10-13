@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-13
+
+- First-name-collision guard no longer fires when the following word is ALL CAPS (2+ letters):
+  `NICO WTF`, `THE SEIYA SPECIAL` are credited. An all-caps word still blocks when it is a
+  tracked surname (`ANTHONY VOLPE` stays uncredited to Roman Anthony); an untracked all-caps
+  surname (`ANTHONY HISCHIER`) is credited, accepted tradeoff. `name_pattern` takes an optional
+  `surnames` set for this. Title-case headlines (`Seiya Mash Against Skenes`) remain a limitation.
+
 ## 2026-10-12
 
 - Name matching is accent-insensitive in both directions (`Alcantara` = `Alcántara`);

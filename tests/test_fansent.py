@@ -90,6 +90,21 @@ def test_surname_that_is_first_name_still_matches_otherwise():
     assert _ids("Anthony\n\nVolpe", _ANTHONY) == ["1", "2"]
 
 
+def test_all_caps_following_word_is_emphasis_not_surname():
+    nico = name_pattern("Nico", full_name="Nico Hoerner", guard=True)
+    seiya = name_pattern("Seiya", full_name="Seiya Suzuki", guard=True)
+    assert nico.search("NICO WTF") and nico.search("Nico WTF")
+    assert seiya.search("THE SEIYA SPECIAL")
+    assert not nico.search("Nico Hischier scored")
+
+
+def test_all_caps_surname_still_blocks_only_when_tracked():
+    assert _ids("ANTHONY VOLPE went deep", _ANTHONY) == ["2"]
+    assert _ids("Anthony VOLPE went deep", _ANTHONY) == ["2"]
+    assert _ids("ANTHONY IS RAKING", _ANTHONY) == ["1"]
+    assert _ids("ANTHONY HISCHIER", _ANTHONY) == ["1"]  # untracked all-caps surname: accepted
+
+
 def test_own_suffix_and_name_tokens_do_not_block():
     players = [_p("1", "Roman Anthony")]
     assert _ids("Anthony Jr hit one", players) == ["1"]
@@ -105,6 +120,10 @@ def test_alias_guard_hook():
     assert nico.search("Nico Hoerner homered")
     assert nico.search("Nico is hot")
     assert not nico.search("Nico Hischier scored")
+    assert nico.search("NICO WTF")
+    assert not name_pattern(
+        "Nico", full_name="Nico Hoerner", guard=True, surnames=frozenset({"hischier"})
+    ).search("NICO HISCHIER")
     assert name_pattern("Moisés", full_name="Moisés Ballesteros", guard=True).search("MOISES!")
     cs = name_pattern("PCA", full_name="Pete Crow-Armstrong", case_sensitive=True)
     assert cs.search("PCA rules") and not cs.search("pca rules")
