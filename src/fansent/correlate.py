@@ -18,13 +18,14 @@ from .panel import (
     build_weekly_panel,
     sentiment_periods,
 )
-from .util import DATA_DIR, OAA_CSV, SENTIMENT_CSV, STATS_CSV
+from .util import DEFAULT_DATA_DIR, OAA_FILE, SENTIMENT_FILE, STATS_FILE
 
-FANBASES_OUT = DATA_DIR / "analysis_fanbases.csv"
-UNITS_OUT = DATA_DIR / "analysis_units.csv"
-OAA_OUT = DATA_DIR / "analysis_oaa.csv"
-REDDIT_ATTRIBUTION_CSV = DATA_DIR / "reddit_attribution.csv"
-NEWS_HEADLINES_CSV = DATA_DIR / "news_headlines.csv"
+FANBASES_OUT = "analysis_fanbases.csv"
+UNITS_OUT = "analysis_units.csv"
+OAA_OUT = "analysis_oaa.csv"
+OAA_UNITS_OUT = "analysis_oaa_units.csv"
+REDDIT_ATTRIBUTION_FILE = "reddit_attribution.csv"
+NEWS_HEADLINES_FILE = "news_headlines.csv"
 
 FAMILY_METRICS = "metrics"
 FAMILY_COMPOSITE = "COMPOSITE"
@@ -159,24 +160,35 @@ def run(
     oaa_path: Path | None,
     correction: str,
     alpha: float,
+    data_dir: Path = DEFAULT_DATA_DIR,
 ) -> None:
-    stats = pd.read_csv(STATS_CSV, dtype={"player_id": str})
-    if not SENTIMENT_CSV.exists():
-        raise SystemExit(f"{SENTIMENT_CSV} not found — run `fansent score` first.")
-    scores = pd.read_csv(SENTIMENT_CSV, dtype={"text_id": str, "player_id": str})
-    sidecars = [_read_optional(REDDIT_ATTRIBUTION_CSV), _read_optional(NEWS_HEADLINES_CSV)]
-    path = oaa_path or (OAA_CSV if OAA_CSV.exists() else None)
+    stats = pd.read_csv(data_dir / STATS_FILE, dtype={"player_id": str})
+    sentiment_csv = data_dir / SENTIMENT_FILE
+    if not sentiment_csv.exists():
+        raise SystemExit(f"{sentiment_csv} not found — run `fansent score` first.")
+    scores = pd.read_csv(sentiment_csv, dtype={"text_id": str, "player_id": str})
+    sidecars = [
+        _read_optional(data_dir / REDDIT_ATTRIBUTION_FILE),
+        _read_optional(data_dir / NEWS_HEADLINES_FILE),
+    ]
+    default_oaa = data_dir / OAA_FILE
+    path = oaa_path or (default_oaa if default_oaa.exists() else None)
     oaa = pd.read_csv(path, dtype={"player_id": str}) if path else None
 
     out = analyze(
         stats, scores, [s for s in sidecars if s is not None], oaa, pcfg, icfg, metrics,
         include_composite,
     )  # fmt: skip
-    out.fanbases.to_csv(FANBASES_OUT, index=False)
-    out.units.to_csv(UNITS_OUT, index=False)
+    fanbases_out, units_out, oaa_out = (
+        data_dir / FANBASES_OUT,
+        data_dir / UNITS_OUT,
+        data_dir / OAA_OUT,
+    )
+    out.fanbases.to_csv(fanbases_out, index=False)
+    out.units.to_csv(units_out, index=False)
     if len(out.oaa_fanbases):
-        out.oaa_units.to_csv(OAA_OUT.with_name("analysis_oaa_units.csv"), index=False)
-        out.oaa_fanbases.to_csv(OAA_OUT, index=False)
+        out.oaa_units.to_csv(data_dir / OAA_UNITS_OUT, index=False)
+        out.oaa_fanbases.to_csv(oaa_out, index=False)
 
     print(
         f"\n=== Fanbase effect mu_k: sentiment_t -> better performance t+1 ({correction} < {alpha}) ==="
@@ -184,5 +196,5 @@ def run(
     print(format_table(pd.concat([out.fanbases, out.oaa_fanbases]), correction, alpha))
     for s in out.skipped:
         print(f"skipped {s}")
-    print(f"\n{FANBASES_OUT}, {UNITS_OUT}" + (f", {OAA_OUT}" if len(out.oaa_fanbases) else ""))
+    print(f"\n{fanbases_out}, {units_out}" + (f", {oaa_out}" if len(out.oaa_fanbases) else ""))
     print(f"mu_k is in sd(next-period performance) per sd(sentiment); {out.seconds:.0f}s.")

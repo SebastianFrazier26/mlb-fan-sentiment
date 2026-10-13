@@ -22,7 +22,7 @@ progress; read at session start, update on meaningful deltas).
 - `src/fansent/hierarchical.py` — Gibbs-sampled hierarchical model (`fit` -> `FitResult`); `diagnostics.py` (split-R-hat, bulk ESS); `model_data.py` (panel -> arrays)
 - `src/fansent/names.py`, `util.py` — name matching, paths, CSV I/O (also imported by `fansent-collect`)
 - `tests/` — pytest; `.github/workflows/ci.yml` — lint, format, test, pip-audit
-- `data/` — generated CSVs, gitignored
+- `data/` — generated CSVs, gitignored; location overridable via `fansent --data-dir DIR` / `$FANSENT_DATA_DIR` (`util.resolve_data_dir`, resolved once in `cli.main` and passed to each `run(..., data_dir)`; modules hold filename constants only, never full paths)
 
 ## Conventions
 
