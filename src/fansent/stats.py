@@ -13,13 +13,15 @@ import time
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 
 import requests
 
 from .util import (
-    PLAYERS_CSV,
-    STATS_COUNTS_CSV,
-    STATS_CSV,
+    DEFAULT_DATA_DIR,
+    PLAYERS_FILE,
+    STATS_COUNTS_FILE,
+    STATS_FILE,
     ip_to_outs,
     read_csv,
     week_start,
@@ -239,8 +241,13 @@ def weekly_metrics(splits: list[dict], group: str) -> tuple[list[dict], list[dic
     return long_rows, count_rows
 
 
-def run(season: int, limit: int | None = None, pause: float = 0.3) -> None:
-    players = read_csv(PLAYERS_CSV)
+def run(
+    season: int,
+    limit: int | None = None,
+    pause: float = 0.3,
+    data_dir: Path = DEFAULT_DATA_DIR,
+) -> None:
+    players = read_csv(data_dir / PLAYERS_FILE)
     if limit:
         players = players[:limit]
     rows, count_rows = [], []
@@ -261,6 +268,7 @@ def run(season: int, limit: int | None = None, pause: float = 0.3) -> None:
             n_weeks += len(wide_rows)
             time.sleep(pause)
         print(f"[{i}/{len(players)}] {p['full_name']}: {n_weeks} group-weeks")
-    n = write_csv(STATS_CSV, rows, FIELDS)
-    write_csv(STATS_COUNTS_CSV, count_rows, COUNTS_FIELDS)
-    print(f"Wrote {n} player-week-metric rows to {STATS_CSV} ({STATS_COUNTS_CSV} for counts)")
+    stats_csv, counts_csv = data_dir / STATS_FILE, data_dir / STATS_COUNTS_FILE
+    n = write_csv(stats_csv, rows, FIELDS)
+    write_csv(counts_csv, count_rows, COUNTS_FIELDS)
+    print(f"Wrote {n} player-week-metric rows to {stats_csv} ({counts_csv} for counts)")

@@ -7,6 +7,8 @@ from fansent.panel import (
     PanelConfig,
     build_weekly_panel,
     fanbase_of,
+    filter_own_team,
+    load_team_subreddits,
     oriented,
     sentiment_periods,
 )
@@ -227,3 +229,59 @@ def test_default_composite_weights():
     assert W["pitcher"] == {"ERA": 0.5, "WHIP": 0.5}
     assert PanelConfig().composite_weights == W
     assert PanelConfig().reply_inherited_weight == 1.0
+
+
+TEAMS = {"1": 112, "2": 111}  # player 1 Cubs, player 2 Red Sox
+
+
+def team_rows():
+    return scores(
+        [
+            ("a", "reddit_arctic", "CHICubs", "2026-04-06", "1", 0.2),
+            ("b", "reddit_arctic", "CHICubs", "2026-04-06", "2", 0.2),
+            ("c", "reddit_arctic", "redsox", "2026-04-06", "2", 0.2),
+            ("d", "reddit_arctic", "redsox", "2026-04-06", "1", 0.2),
+            ("e", "reddit_arctic", "redsox", "2026-04-06", "9", 0.2),
+            ("f", "reddit_arctic", "baseball", "2026-04-06", "1", 0.2),
+            ("g", "reddit_arctic", "baseball", "2026-04-06", "2", 0.2),
+            ("h", "gdelt_headline", "", "2026-04-06", "1", 0.2),
+            ("i", "gdelt_headline", "", "2026-04-06", "2", 0.2),
+            ("j", "reddit_arctic", "SomeNewSub", "2026-04-06", "2", 0.2),
+        ]
+    )
+
+
+def test_team_subs_keep_only_own_players():
+    kept, dropped = filter_own_team(team_rows(), PanelConfig(), TEAMS)
+    assert kept["text_id"].tolist() == ["a", "c", "f", "g", "h", "i", "j"]
+    # b: Red Sox player in Cubs sub; d: Cubs player in redsox; e: player not on any roster
+    assert dropped == {"CHICubs": 1, "redsox": 2}
+
+
+def test_league_wide_and_unknown_fanbases_unaffected():
+    kept, _ = filter_own_team(team_rows(), PanelConfig(), TEAMS)
+    league = kept[kept["subreddit"].isin(["baseball", "SomeNewSub", ""])]
+    assert len(league) == 5  # f g j + both headlines
+
+
+def test_all_teams_restores_everything():
+    rows = team_rows()
+    kept, dropped = filter_own_team(rows, PanelConfig(fanbase_teams={}), None)
+    assert len(kept) == len(rows) and dropped == {}
+
+
+def test_subreddit_match_is_case_insensitive():
+    rows = scores([("a", "reddit_arctic", "chicubs", "2026-04-06", "2", 0.2)])
+    kept, dropped = filter_own_team(rows, PanelConfig(), TEAMS)
+    assert kept.empty and dropped == {"chicubs": 1}
+
+
+def test_filter_without_roster_is_an_error_not_a_silent_pass():
+    with pytest.raises(ValueError):
+        filter_own_team(team_rows(), PanelConfig(), None)
+
+
+def test_bundled_map_has_both_demo_teams_and_unique_ids():
+    m = load_team_subreddits()
+    assert m["chicubs"] == frozenset({112}) and m["redsox"] == frozenset({111})
+    assert len(m) == 30 and len({next(iter(v)) for v in m.values()}) == 30

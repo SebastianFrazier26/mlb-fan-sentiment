@@ -10,6 +10,12 @@ by a capitalized word that is not part of the player's own name ('Anthony Volpe'
 is not Roman Anthony). An ALL-CAPS following word is shouting, not a surname
 ('NICO WTF'), so it blocks only when it is a tracked surname ('ANTHONY VOLPE').
 ``name_pattern`` exposes both behaviours for alias layers.
+
+A last name that is also an ordinary English word (``fansent.common_words``: Little,
+Early, Story) matches only when Capitalized, so 'a little rough' is not Luke Little but
+'Little blew the save' is. ALL-CAPS ('LITTLE blew it') counts as capitalized unless the
+whole text has no lowercase letters, where shouting cannot be told from a name. Full-name
+matches stay case-insensitive: a two-word match is already specific.
 """
 
 from __future__ import annotations
@@ -19,6 +25,7 @@ import unicodedata
 from collections import Counter
 from functools import lru_cache
 
+from fansent.common_words import COMMON_WORDS
 from fansent.first_names import COMMON_FIRST_NAMES
 
 NAME_SUFFIXES = frozenset({"jr", "sr", "ii", "iii", "iv"})
@@ -70,16 +77,28 @@ class NamePattern:
     """
 
     def __init__(
-        self, regex: re.Pattern, own: frozenset[str], guard: bool, surnames: frozenset[str]
+        self,
+        regex: re.Pattern,
+        own: frozenset[str],
+        guard: bool,
+        surnames: frozenset[str],
+        shout: re.Pattern | None = None,
     ) -> None:
         self.regex = regex
         self.own = own
         self.guard = guard
         self.surnames = surnames
+        self.shout = shout
 
     def search(self, text: str) -> re.Match | None:
         folded = fold(text)
         for m in self.regex.finditer(folded):
+            if (
+                self.shout
+                and self.shout.fullmatch(m.group())
+                and not any(c.islower() for c in folded)
+            ):
+                continue
             if not self.guard or not _is_blocked(folded, m.end(), self.own, self.surnames):
                 return m
         return None
@@ -91,6 +110,7 @@ def name_pattern(
     full_name: str,
     guard: bool = False,
     case_sensitive: bool = False,
+    capitalized: bool = False,
     surnames: frozenset[str] = frozenset(),
 ) -> NamePattern:
     """Whole-word, accent-insensitive pattern for ``name`` (a full name, surname, or alias).
@@ -100,11 +120,19 @@ def name_pattern(
     names and for surnames that double as first names. A following ALL-CAPS word (2+
     letters) blocks only if its lowercase fold is in ``surnames``. Known limitation: a name at the
     end of a sentence followed by a capitalized sentence start ('Anthony Then homered')
-    is dropped too.
+    is dropped too. ``capitalized=True`` (single-token names) accepts only 'Name' or 'NAME',
+    rejecting NAME-only matches in text with no lowercase letters.
     """
-    body = r"\s+".join(re.escape(w) for w in fold(name).split())
+    folded = fold(name)
+    own = frozenset(_tokens(full_name) | NAME_SUFFIXES)
+    if capitalized:
+        title = re.escape(folded.lower().capitalize())
+        upper = re.escape(folded.upper())
+        regex = re.compile(rf"\b(?:{title}|{upper})\b")
+        return NamePattern(regex, own, guard, surnames, re.compile(upper))
+    body = r"\s+".join(re.escape(w) for w in folded.split())
     regex = re.compile(rf"\b{body}\b", 0 if case_sensitive else re.IGNORECASE)
-    return NamePattern(regex, frozenset(_tokens(full_name) | NAME_SUFFIXES), guard, surnames)
+    return NamePattern(regex, own, guard, surnames)
 
 
 class _FullOrLast:
@@ -134,6 +162,7 @@ def build_matchers(players: list[dict]) -> list[tuple[dict, _FullOrLast]]:
                 last,
                 full_name=p["full_name"],
                 guard=fold(last).lower() in first_names,
+                capitalized=fold(last).lower() in COMMON_WORDS,
                 surnames=surnames,
             )
         matchers.append((p, _FullOrLast(full, last_pat)))

@@ -8,8 +8,10 @@ rides along and `oriented()` applies the sign only when a model is fed, so effec
 
 from __future__ import annotations
 
+import csv
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -19,6 +21,15 @@ from .composite import DEFAULT_COMPOSITE_WEIGHTS, composite_index
 NEWS_SOURCE = "gdelt_headline"
 NEWS_FANBASE = "news"
 INHERITED = "reply_inherited"
+
+TEAM_SUBREDDITS_PATH = Path(__file__).with_name("team_subreddits.csv")
+
+
+def load_team_subreddits(path: Path = TEAM_SUBREDDITS_PATH) -> dict[str, frozenset[int] | None]:
+    """subreddit (lower-cased: Reddit names are case-insensitive) -> {team_id}."""
+    with open(path, newline="", encoding="utf-8") as f:
+        return {r["subreddit"].lower(): frozenset({int(r["team_id"])}) for r in csv.DictReader(f)}
+
 
 # Weekly weight units as written by stats.py: PA (OPS), AB (AVG), IP (ERA, WHIP), chances,
 # SB+CS attempts. Unconfirmed assumptions, not tuned values.
@@ -52,6 +63,11 @@ PANEL_COLS = [
 class PanelConfig:
     min_weight: Mapping[str, float] = field(default_factory=lambda: dict(DEFAULT_MIN_WEIGHT))
     min_mentions: int = 3
+    # Team fanbases only count their own team's players (decision 2026-10-13). Fanbase -> allowed
+    # team ids, keys lower-case; a fanbase absent from the map or mapped to None is league-wide
+    # (baseball, news) rather than an error, so non-team sources and new subs keep working. {}
+    # disables the filter (`--all-teams`).
+    fanbase_teams: Mapping[str, frozenset[int] | None] = field(default_factory=load_team_subreddits)
     min_weeks: int = 8
     min_units_per_fanbase: int = 3
     # Reply comments inherit the player from the parent comment; 1.0 treats them like explicit
@@ -75,6 +91,34 @@ def fanbase_of(source: pd.Series, subreddit: pd.Series) -> pd.Series:
     sub = subreddit.fillna("").astype(str).str.strip()
     named = sub.where(sub != "", source.astype(str))
     return named.where(source != NEWS_SOURCE, NEWS_FANBASE)
+
+
+def filter_own_team(
+    scores: pd.DataFrame, cfg: PanelConfig, player_teams: Mapping[str, int] | None
+) -> tuple[pd.DataFrame, dict[str, int]]:
+    """Drop rows where a team fanbase mentions a player outside its team(s).
+
+    player_teams: player_id -> team_id from players.csv (current roster, so a traded player
+    leaves his old team's fanbase). Players missing from the map count as off-team. Returns
+    (kept rows, dropped row count per fanbase)."""
+    fanbase = fanbase_of(scores["source"], scores["subreddit"])
+    allowed = fanbase.str.lower().map(dict(cfg.fanbase_teams))
+    restricted = allowed.notna()
+    if not restricted.any():
+        return scores, {}
+    if player_teams is None:
+        raise ValueError("player_teams is required when a team fanbase filter applies")
+    team = scores["player_id"].astype(str).map(dict(player_teams))
+    own = pd.Series(
+        [
+            pd.notna(t) and t in a if isinstance(a, frozenset) else False
+            for t, a in zip(team, allowed, strict=True)
+        ],
+        index=scores.index,
+    )
+    drop = restricted & ~own
+    counts = fanbase[drop].value_counts()
+    return scores[~drop], {str(k): int(v) for k, v in counts.items()}
 
 
 def attach_attribution(

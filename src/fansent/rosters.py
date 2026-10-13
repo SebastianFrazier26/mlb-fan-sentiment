@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import requests
 
-from .util import PLAYERS_CSV, write_csv
+from .util import DEFAULT_DATA_DIR, PLAYERS_FILE, write_csv
 
 API = "https://statsapi.mlb.com/api/v1"
 
@@ -53,8 +55,9 @@ def fetch_rosters(season: int, roster_type: str = "fullSeason") -> list[dict]:
     return rows
 
 
-def run(season: int, roster_type: str = "fullSeason") -> None:
+def run(season: int, roster_type: str = "fullSeason", data_dir: Path = DEFAULT_DATA_DIR) -> None:
     rows = fetch_rosters(season, roster_type)
-    n = write_csv(PLAYERS_CSV, rows, FIELDS)
+    out = data_dir / PLAYERS_FILE
+    n = write_csv(out, rows, FIELDS)
     per_team = {name: sum(1 for r in rows if r["team"] == name) for _, (name, _) in TEAMS.items()}
-    print(f"Wrote {n} players to {PLAYERS_CSV} ({per_team})")
+    print(f"Wrote {n} players to {out} ({per_team})")

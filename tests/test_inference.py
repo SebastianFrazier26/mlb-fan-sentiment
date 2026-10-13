@@ -63,7 +63,7 @@ def e2e():
     stats = make_stats(n_players=8, weeks=24, seed=5)
     scores = make_scores(stats, {"CHICubs": 1.0, "redsox": 0.0}, seed=6)
     icfg = InferenceConfig(n_iter=800, burn=400, perm_b=39, perm_iter=300, perm_burn=150, seed=1)
-    pcfg = PanelConfig(min_weeks=8, min_units_per_fanbase=3)
+    pcfg = PanelConfig(min_weeks=8, min_units_per_fanbase=3, fanbase_teams={})
     return analyze(stats, scores, [], None, pcfg, icfg)
 
 
@@ -97,6 +97,12 @@ def test_sidecar_input_accepted():
     )
     icfg = InferenceConfig(n_iter=300, burn=150, perm_b=3, perm_iter=150, perm_burn=75)
     out = analyze(
-        stats, scores, [side], None, PanelConfig(min_weeks=6), icfg, include_composite=False
+        stats,
+        scores,
+        [side],
+        None,
+        PanelConfig(min_weeks=6, fanbase_teams={}),
+        icfg,
+        include_composite=False,
     )
     assert {"news", "baseball"} == set(out.fanbases["fanbase"])
