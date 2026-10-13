@@ -1,0 +1,6 @@
+"last_name, first_name",player_id,year,month,primary_pos_formatted,fielding_runs_prevented,outs_above_average,attempts
+"Crawford, Pete",999001,2026,2026-04,SS,1,2,40
+"Crawford, Pete",999001,2026,2026-05,SS,-1,-1,35
+"Hoerner, Nico",999002,2026,2026-04,2B,2,3,50
+"Hoerner, Nico",999002,2026,2026-04,SS,0,1,5
+"Nobody, Null",999003,2026,2026-04,LF,,,

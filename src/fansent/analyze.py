@@ -21,15 +21,16 @@ from .util import DATA_DIR, NEWS_TONE_CSV, SENTIMENT_CSV, STATS_CSV, week_start
 MIN_PA_WEEK = 10
 MIN_IP_WEEK = 3.0
 PLAYERS_OUT = DATA_DIR / "analysis_players.csv"
-FANBASES_OUT = DATA_DIR / "analysis_fanbases.csv"
+FANBASES_OUT = DATA_DIR / "analysis_fanbases_partial.csv"
 
 
 def load_perf() -> pd.DataFrame:
     df = pd.read_csv(STATS_CSV)
+    df = df[df["metric"].isin(["OPS", "ERA"])]
     df["week_start"] = pd.to_datetime(df["week_start"])
     # Orient so higher == better for every player (ERA gets negated).
     df["perf"] = np.where(df["higher_is_better"], df["value"], -df["value"])
-    ok = np.where(df["metric"] == "OPS", df["sample"] >= MIN_PA_WEEK, df["sample"] >= MIN_IP_WEEK)
+    ok = np.where(df["metric"] == "OPS", df["weight"] >= MIN_PA_WEEK, df["weight"] >= MIN_IP_WEEK)
     return df[ok][["player_id", "full_name", "team", "week_start", "perf"]]
 
 
