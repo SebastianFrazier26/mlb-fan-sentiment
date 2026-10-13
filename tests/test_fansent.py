@@ -3,7 +3,7 @@ import datetime as dt
 import numpy as np
 
 from fansent.analyze import partial_corr
-from fansent.names import build_matchers, find_mentions
+from fansent.names import build_matchers, find_mentions, fold, name_pattern
 from fansent.util import parse_ip, week_start
 
 
@@ -43,6 +43,71 @@ def test_shared_last_name_needs_full_name():
 def test_no_substring_false_positive():
     matchers = build_matchers(_players())
     assert find_mentions("the suzukimobile", matchers) == []
+
+
+def _ids(text, players):
+    return [p["player_id"] for p in find_mentions(text, build_matchers(players))]
+
+
+def _p(pid, full, last=None):
+    return {"player_id": pid, "full_name": full, "last_name": last or full.split()[-1]}
+
+
+def test_accents_fold_both_directions():
+    players = [_p("1", "Jose Alcántara"), _p("2", "Yacksel Rios"), _p("3", "Moisés Ballesteros")]
+    assert _ids("Alcantara homered", players) == ["1"]
+    assert _ids("Ríos came in to pitch", players) == ["2"]
+    assert _ids("Moises Ballesteros is hitting", players) == ["3"]
+    assert _ids("ALCÁNTARA!", players) == ["1"]
+
+
+def test_fold_preserves_length_and_offsets():
+    text = "Hoy Alcántara conectó"
+    assert len(fold(text)) == len(text)
+    m = name_pattern("Alcantara", full_name="Jose Alcantara").search(text)
+    assert text[m.start() : m.end()] == "Alcántara"
+
+
+_ANTHONY = [
+    _p("1", "Roman Anthony"),
+    _p("2", "Anthony Volpe"),
+    _p("3", "Anthony Rizzo"),
+    _p("4", "Anthony Seigler"),
+]
+
+
+def test_surname_that_is_first_name_not_credited_before_capitalized_word():
+    assert _ids("Anthony Volpe went deep", _ANTHONY) == ["2"]
+    assert _ids("Anthony Rizzo went deep", _ANTHONY) == ["3"]
+    assert _ids("Anthony Seigler went deep", _ANTHONY) == ["4"]
+
+
+def test_surname_that_is_first_name_still_matches_otherwise():
+    assert _ids("Anthony is raking", _ANTHONY) == ["1"]
+    assert _ids("Great game, Anthony.", _ANTHONY) == ["1"]
+    assert _ids("Roman Anthony is raking", _ANTHONY) == ["1"]
+    assert _ids("anthony volpe", _ANTHONY) == ["1", "2"]  # lowercase: no capital cue
+    assert _ids("Anthony\n\nVolpe", _ANTHONY) == ["1", "2"]
+
+
+def test_own_suffix_and_name_tokens_do_not_block():
+    players = [_p("1", "Roman Anthony")]
+    assert _ids("Anthony Jr hit one", players) == ["1"]
+
+
+def test_sentence_start_capitalization_is_a_known_limitation():
+    # 'Then' is indistinguishable from a surname without a name list.
+    assert _ids("Anthony Then homered", _ANTHONY) == []
+
+
+def test_alias_guard_hook():
+    nico = name_pattern("Nico", full_name="Nico Hoerner", guard=True)
+    assert nico.search("Nico Hoerner homered")
+    assert nico.search("Nico is hot")
+    assert not nico.search("Nico Hischier scored")
+    assert name_pattern("Moisés", full_name="Moisés Ballesteros", guard=True).search("MOISES!")
+    cs = name_pattern("PCA", full_name="Pete Crow-Armstrong", case_sensitive=True)
+    assert cs.search("PCA rules") and not cs.search("pca rules")
 
 
 def test_partial_corr_detects_lagged_signal():

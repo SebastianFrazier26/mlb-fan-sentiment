@@ -2,6 +2,15 @@
 
 ## 2026-10-12
 
+- Name matching is accent-insensitive in both directions (`Alcantara` = `Alcántara`);
+  folding is length-preserving so match offsets stay valid.
+- First-name-collision guard: a bare surname that is also a common first name
+  (`Anthony` for Roman Anthony) is not credited when directly followed by a capitalized
+  word outside the player's own name (`Anthony Volpe`). Known limitation: a sentence
+  start after the name (`Anthony Then homered`) is dropped too.
+- New `fansent.names.name_pattern(...)` (accent folding + optional guard) for alias layers;
+  `build_matchers` now returns pattern-like objects with `.search()` instead of `re.Pattern`.
+- New `fansent.first_names.COMMON_FIRST_NAMES`; roster first names are added at build time.
 - Multiple-comparison correction now runs within separate families: `metrics`
   (OPS/AVG/ERA/WHIP/FLD_PCT/ERRORS), `COMPOSITE`, `OAA`. `CS_PCT` is exploratory (raw
   `perm_p`, NA `q_bh`/`p_holm`). `analysis_fanbases.csv` gains `family` and `exploratory`
