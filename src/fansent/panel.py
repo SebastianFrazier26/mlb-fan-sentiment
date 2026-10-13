@@ -22,10 +22,10 @@ NEWS_SOURCE = "gdelt_headline"
 NEWS_FANBASE = "news"
 INHERITED = "reply_inherited"
 
-TEAM_SUBREDDITS_CSV = Path(__file__).with_name("team_subreddits.csv")
+TEAM_SUBREDDITS_PATH = Path(__file__).with_name("team_subreddits.csv")
 
 
-def load_team_subreddits(path: Path = TEAM_SUBREDDITS_CSV) -> dict[str, frozenset[int] | None]:
+def load_team_subreddits(path: Path = TEAM_SUBREDDITS_PATH) -> dict[str, frozenset[int] | None]:
     """subreddit (lower-cased: Reddit names are case-insensitive) -> {team_id}."""
     with open(path, newline="", encoding="utf-8") as f:
         return {r["subreddit"].lower(): frozenset({int(r["team_id"])}) for r in csv.DictReader(f)}

@@ -30,6 +30,12 @@ uv run fansent score                          # VADER -> data/sentiment.csv
 uv run fansent correlate --perm-b 1000 --workers 8   # -> data/analysis_{fanbases,units,oaa}.csv
 ```
 
+All commands read and write one data directory, chosen by `--data-dir DIR` (given before the
+subcommand, e.g. `fansent --data-dir ~/fansent-data stats`), else `$FANSENT_DATA_DIR`, else
+`./data` relative to the current directory. Note `fansent-collect` defaults differently (an
+absolute path next to this checkout), so set `FANSENT_DATA_DIR` in your shell if you run both
+tools from arbitrary directories.
+
 ## Where the text data comes from
 
 Reddit and news collection lives in a separate, private companion repo

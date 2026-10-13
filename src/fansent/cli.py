@@ -3,12 +3,21 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
+
+from .util import ENV_VAR, resolve_data_dir
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         prog="fansent",
         description="Correlate fan sentiment with MLB player performance.",
+    )
+    parser.add_argument(
+        "--data-dir",
+        metavar="DIR",
+        help=f"Directory for all CSV inputs/outputs (default: ${ENV_VAR}, else ./data); "
+        "give before the subcommand",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -54,39 +63,38 @@ def main() -> None:
     )
     p.add_argument("--metrics", nargs="+", help="Subset of metrics (default: all with data)")
     p.add_argument("--no-composite", action="store_true", help="Skip the COMPOSITE index")
-    p.add_argument("--oaa", help="OAA monthly CSV (default: data/oaa_monthly.csv if present)")
+    p.add_argument("--oaa", help="OAA monthly CSV (default: <data-dir>/oaa_monthly.csv if present)")
     p.add_argument("--perm-b", type=int, default=1000, help="Permutation replicates per metric")
     p.add_argument("--workers", type=int, default=1, help="Processes for the permutation null")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--correction", choices=["bh", "holm"], default="bh")
     p.add_argument("--alpha", type=float, default=0.05)
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
+    data_dir = resolve_data_dir(args.data_dir)
 
     if args.command == "rosters":
         from . import rosters
 
-        rosters.run(args.season, args.roster_type)
+        rosters.run(args.season, args.roster_type, data_dir)
     elif args.command == "stats":
         from . import stats
 
-        stats.run(args.season, args.limit)
+        stats.run(args.season, args.limit, data_dir=data_dir)
     elif args.command == "oaa":
         from . import oaa
 
-        oaa.run(args.path)
+        oaa.run(args.path, data_dir)
     elif args.command == "score":
         from . import sentiment
 
-        sentiment.run()
+        sentiment.run(data_dir)
     elif args.command == "correlate":
         if args.method == "partial":
             from . import analyze
 
-            analyze.run(args.min_weeks, args.min_mentions)
+            analyze.run(args.min_weeks, args.min_mentions, data_dir)
         else:
-            from pathlib import Path
-
             from . import correlate
             from .inference import InferenceConfig
             from .panel import PanelConfig
@@ -105,6 +113,7 @@ def main() -> None:
                 Path(args.oaa) if args.oaa else None,
                 args.correction,
                 args.alpha,
+                data_dir,
             )
 
 

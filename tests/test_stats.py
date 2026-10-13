@@ -134,8 +134,6 @@ def test_cumulative_spans_gap_weeks():
 
 
 def test_run_with_mocked_http(tmp_path, monkeypatch):
-    monkeypatch.setattr(stats, "STATS_CSV", tmp_path / "stats.csv")
-    monkeypatch.setattr(stats, "STATS_COUNTS_CSV", tmp_path / "counts.csv")
     monkeypatch.setattr(
         stats,
         "read_csv",
@@ -150,11 +148,11 @@ def test_run_with_mocked_http(tmp_path, monkeypatch):
         "fielding": [_fld("2026-04-06", 1, chances=2, putOuts=2)],
     }
     monkeypatch.setattr(stats, "fetch_game_log", lambda pid, season, group: logs[group])
-    stats.run(2026, pause=0)
+    stats.run(2026, pause=0, data_dir=tmp_path)
     text = (tmp_path / "stats.csv").read_text()
     for metric in ("OPS", "AVG", "ERA", "WHIP", "FLD_PCT", "ERRORS"):
         assert f",{metric}," in text
-    assert (tmp_path / "counts.csv").exists()
+    assert (tmp_path / "stats_counts.csv").exists()
 
 
 def test_load_oaa_monthly_fixture():
