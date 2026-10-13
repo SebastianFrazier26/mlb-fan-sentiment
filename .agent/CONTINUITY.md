@@ -37,7 +37,7 @@
 - 2026-08-18T00:00Z [TOOL] GDELT rate-limits ~1 req/5s per IP (429 otherwise) — collector uses 5.5s pause + backoff retry.
 - 2026-08-18T00:00Z [TOOL] Academic Torrents subreddit dumps cover 2005-06..2025-12, per-subreddit files (top 40k subs) — solves Reddit historical backfill.
 - 2026-08-18T00:00Z [TOOL] Reddit API free tier (100 QPM/OAuth client, non-commercial) confirmed still current as of 2026-08.
+- 2026-10-13T00:00Z [CODE] Branch feat/classifier: fansent.classifier (text, features, softmax, pipeline, overlay, scorers, evaluate), `clf-eval`/`clf-train`/`score --scorer`, synthetic-only tests. Not run on real labels.
 
 ## [OUTCOMES]
 - 2026-08-18T00:00Z [CODE] MVP pipeline built and verified (unit + synthetic e2e + live smokes). Remaining: user torrents Reddit .zst dumps (baseball/CHICubs/redsox) and runs reddit-dump -> score -> correlate; optional reddit-live creds; top-100 player list; Docker build unverified.
-- 2026-10-13T00:00Z [CODE] Branch feat/classifier: fansent.classifier (text, features, softmax, pipeline, overlay, scorers, evaluate), `clf-eval`/`clf-train`/`score --scorer`, synthetic-only tests. Not run on real labels.
