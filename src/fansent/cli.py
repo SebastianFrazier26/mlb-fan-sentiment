@@ -70,6 +70,16 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--out", help="Model path (default: <data-dir>/models/clf.npz)")
     add_grid(p)
 
+    p = sub.add_parser("label", help="Label a sentiment-eval CSV in a local browser page")
+    p.add_argument(
+        "--file",
+        required=True,
+        help="CSV with at least id, player, text columns; relative paths resolve from the "
+        "current directory, not --data-dir",
+    )
+    p.add_argument("--port", type=int, default=8765, help="Port on 127.0.0.1 (0 = any free)")
+    p.add_argument("--open", action="store_true", help="Open the page in the default browser")
+
     p = sub.add_parser(
         "correlate", help="Fanbase effect of sentiment on next-week performance (hierarchical)"
     )
@@ -135,6 +145,10 @@ def main(argv: list[str] | None = None) -> None:
         else:
             out = Path(args.out) if args.out else data_dir / MODELS_DIR / MODEL_FILE
             evaluate.run_train(train, out, players, args.cv, grid, args.seed)
+    elif args.command == "label":
+        from . import label
+
+        label.run(args.file, args.port, args.open)
     elif args.command == "correlate":
         if args.method == "partial":
             from . import analyze
