@@ -19,7 +19,7 @@ Fanbases compared: r/CHICubs, r/redsox, r/baseball (neutral baseline), and
 ## Setup
 
 ```sh
-make setup          # uv sync (or: uv sync --extra live for the Reddit API collector)
+make setup          # uv sync
 make check          # ruff + pytest
 ```
 
@@ -30,31 +30,28 @@ Docker alternative: `make docker-build`, then `make docker-run ARGS="rosters"`.
 ```sh
 uv run fansent rosters --season 2025          # Cubs + Red Sox -> data/players.csv
 uv run fansent stats --season 2025            # weekly OPS/ERA -> data/stats.csv
-uv run fansent reddit-dump path/to/*.zst \
-    --since 2025-03-01 --until 2025-11-15     # dump mentions -> data/texts.csv
-uv run fansent news --start 2025-03-01 --end 2025-11-15   # GDELT tone -> data/news_tone.csv
+# texts.csv + news_tone.csv come from the collectors (see below)
 uv run fansent score                          # VADER -> data/sentiment.csv
 uv run fansent correlate                      # -> data/analysis_{players,fanbases}.csv
 ```
 
-`fansent reddit-live` (optional, `--extra live` + `REDDIT_CLIENT_ID`/
-`REDDIT_CLIENT_SECRET` env vars) collects new comments going forward via the
-free Reddit API tier.
+## Where the text data comes from
 
-## Getting historical Reddit data
+Reddit and news collection lives in a separate, private companion repo
+(`fansent-collect`), kept out of this public repo by design. It reads
+`data/players.csv` and writes into `data/`:
 
-The Reddit API can't reach old content. Use the community Pushshift-derived
-dumps on Academic Torrents ("Subreddit comments/submissions 2005-06 to
-2025-12", maintained by u/Watchful1 — <https://academictorrents.com/details/3e3f64dee22dc304cdd2546254ca1f8e8ae542b4>):
-in your torrent client, select **only** the files for `baseball`, `CHICubs`,
-and `redsox` (comments + submissions), then run `fansent reddit-dump` on the
-downloaded `.zst` files. Personal research use only.
+- `texts.csv` — `text_id, source, subreddit, date, created_utc, player_id, player_name, text`
+  (one row per text × mentioned player; `date` is the UTC day)
+- `news_tone.csv` — `player_id, player_name, team, date, tone`
+
+Anything that produces CSVs with those columns can feed `score` / `correlate`.
 
 ## Data sources
 
 - **MLB Stats API** (statsapi.mlb.com) — rosters + game logs; free, no key, read-only.
-- **Reddit dumps / Reddit API** — fan comments; free tier, non-commercial.
-- **GDELT DOC 2.0** — daily news tone per player; free, no key; coverage from 2017.
+- **Reddit** (via `fansent-collect`) — fan comments; personal, non-commercial research.
+- **GDELT DOC 2.0** (via `fansent-collect`) — news per player; free, no key.
 
 ## Notes & caveats
 
@@ -63,3 +60,7 @@ downloaded `.zst` files. Personal research use only.
 - Weekly windows are Mon–Sun. Player-weeks below 10 PA / 3 IP are dropped.
 - Weekly OPS/ERA is extremely noisy — expect small correlations; the
   cross-fanbase *comparison* is the robust readout, not any single player's r.
+
+## License
+
+Apache-2.0 — see [LICENSE](LICENSE).

@@ -6,7 +6,9 @@
   day-to-day dev path; Docker is the reproducible path.
 - Checks: `make check` (ruff + pytest). Run before considering a change done.
 - All generated CSVs live in `data/` (gitignored). Never commit dump files.
-- Remote APIs used (MLB Stats API, GDELT, Reddit) are read-only GETs; keep it
-  that way. Reddit credentials come from env vars, never files in the repo.
+- Remote APIs used here (MLB Stats API) are read-only GETs; keep it that way.
+- Reddit/GDELT collectors live in the PRIVATE `fansent-collect` repo
+  (`../fansent-collect`). Never add scrapers/collectors to this public repo; it
+  only consumes their CSVs (`texts.csv`, `news_tone.csv`).
 - Continuity briefing: `.agent/CONTINUITY.md` — read at the start of a session,
   update on meaningful deltas.

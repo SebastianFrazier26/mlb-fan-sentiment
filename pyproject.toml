@@ -3,8 +3,10 @@ name = "fansent"
 version = "0.1.0"
 description = "Fan sentiment vs. MLB player performance: are the fans always right?"
 requires-python = ">=3.12"
+license = "Apache-2.0"
 dependencies = [
     "requests>=2.32",
+    "numpy>=2.0",
     "pandas>=2.2",
     "scipy>=1.14",
     "vaderSentiment>=3.3",
