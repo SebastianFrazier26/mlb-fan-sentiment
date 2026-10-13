@@ -32,7 +32,7 @@ uv run fansent correlate --perm-b 1000 --workers 8   # -> data/analysis_{fanbase
 
 ## Sentiment scoring
 
-`fansent score --scorer vader|lexicon|clf [--model data/models/clf.npz]` writes
+`fansent score --scorer vader|lexicon|clf [--model PATH]` writes
 `sentiment.csv`; `compound` is the score in [-1, 1] whichever scorer ran, so `correlate`
 is unchanged.
 
@@ -51,11 +51,18 @@ Labeled CSV schema (`text, player, player_id, final_label` or `draft_label`, opt
 
 ```sh
 uv run fansent clf-eval --train a.csv b.csv --test test.csv   # CV-tunes, then VADER vs lexicon vs clf
-uv run fansent clf-train --train a.csv b.csv --out data/models/clf.npz
-uv run fansent score --scorer clf --model data/models/clf.npz
+uv run fansent clf-train --train a.csv b.csv
+uv run fansent score --scorer clf
 ```
 
-`--players` (default `data/players.csv`) supplies the roster used for `__OTH__` masking.
+`--players` (default `<data-dir>/players.csv`) supplies the roster used for `__OTH__` masking;
+`clf-train --out` and `score --model` default to `<data-dir>/models/clf.npz`. Explicit path
+arguments are taken as given (relative to the current directory, not `--data-dir`).
+All commands read and write one data directory, chosen by `--data-dir DIR` (given before the
+subcommand, e.g. `fansent --data-dir ~/fansent-data stats`), else `$FANSENT_DATA_DIR`, else
+`./data` relative to the current directory. Note `fansent-collect` defaults differently (an
+absolute path next to this checkout), so set `FANSENT_DATA_DIR` in your shell if you run both
+tools from arbitrary directories.
 
 ## Where the text data comes from
 
@@ -83,7 +90,14 @@ into `sentiment.csv` (VADER compound per text x player).
 
 Per metric (OPS, AVG, ERA, WHIP, FLD_PCT, ERRORS, CS_PCT, and a COMPOSITE index):
 
-1. **Panel.** Fanbase = subreddit for Reddit, `news` for `gdelt_headline`. Per (fanbase,
+1. **Panel.** Fanbase = subreddit for Reddit, `news` for `gdelt_headline`. A team subreddit
+   counts only mentions of its own team's players (user decision 2026-10-13): team membership
+   is `team_id` in `players.csv` (current roster, so a traded player leaves his old team's
+   subreddit), and the subreddit-to-team map is the bundled `src/fansent/team_subreddits.csv`
+   (all 30 teams; only CHICubs and redsox are `verified`, the other names are from memory and
+   marked `unverified`). `r/baseball`, `news`, and any subreddit not in the map are league-wide
+   (no filter); rows dropped per fanbase are printed. `--all-teams` (or
+   `PanelConfig(fanbase_teams={})`) disables the filter for sensitivity checks. Per (fanbase,
    player, Mon-Sun week): weighted mean VADER compound and mention count. Each row at week *t*
    carries `perf` = metric at *t*, `std` = season-to-date metric through *t*, `sent` at *t*,
    `y_next` = metric at *t+1* (consecutive weeks required) and `weight` = the sample size at

@@ -10,6 +10,22 @@
   `fansent score --scorer vader|lexicon|clf [--model PATH]`; `sentiment.csv` format unchanged
   (default stays `vader`). Baseball lexicon overlay is data: `classifier/baseball_lexicon.json`.
 
+- Own-team filter: a team subreddit fanbase counts only its own team's players (roster
+  `team_id` from `players.csv`); `r/baseball`, `news` and unmapped subreddits stay league-wide.
+  Data-driven map in `fansent/team_subreddits.csv` (30 teams, only CHICubs/redsox verified),
+  `PanelConfig.fanbase_teams`, `panel.filter_own_team`, dropped-row counts printed by
+  `correlate`. `fansent correlate --all-teams` restores the old behaviour. This changes
+  results relative to earlier runs.
+- Global `--data-dir DIR` option (before the subcommand) with `FANSENT_DATA_DIR` fallback, then
+  `./data` as before. Every subcommand honors it. Breaking for Python importers: `util.DATA_DIR`
+  and the `*_CSV` path constants are replaced by `DEFAULT_DATA_DIR`, `resolve_data_dir()` and
+  `*_FILE` filenames; `run()` functions take a trailing `data_dir` argument.
+- Surnames that are ordinary English words (`fansent.common_words`, ~600 curated entries) match
+  only when Capitalized: `a little rough` / `early innings` / `what a story` no longer credit
+  Luke Little / Connelly Early / Trevor Story, while `Little blew the save` does. Full-name
+  matches stay case-insensitive. ALL-CAPS surname counts unless the whole text has no
+  lowercase letters. Known limitation: a sentence-initial `Early innings` still matches.
+  `name_pattern` takes `capitalized=True` for alias layers.
 - First-name-collision guard no longer fires when the following word is ALL CAPS (2+ letters):
   `NICO WTF`, `THE SEIYA SPECIAL` are credited. An all-caps word still blocks when it is a
   tracked surname (`ANTHONY VOLPE` stays uncredited to Roman Anthony); an untracked all-caps

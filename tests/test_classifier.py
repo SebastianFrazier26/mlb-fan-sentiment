@@ -128,7 +128,7 @@ def test_overlay_flips_slang():
     assert LexiconVader({"goat": 2.5}).compound("The GOAT!") > 0.05
 
 
-def test_scorer_interface_and_sentiment_csv_schema(tmp_path, monkeypatch):
+def test_scorer_interface_and_sentiment_csv_schema(tmp_path):
     ex = _toy(5)
     model = SentimentClassifier(ClfConfig(features=FeatureConfig(min_df=1)), Masker(PLAYERS)).fit(
         ex
@@ -160,16 +160,18 @@ def test_scorer_interface_and_sentiment_csv_schema(tmp_path, monkeypatch):
         )
     players = tmp_path / "players.csv"
     util.write_csv(players, PLAYERS, ["player_id", "full_name", "last_name"])
-    monkeypatch.setattr(sentiment, "TEXTS_CSV", texts)
-    monkeypatch.setattr(sentiment, "PLAYERS_CSV", players)
     for name in ("vader", "lexicon", "clf"):
-        out = tmp_path / f"{name}.csv"
-        monkeypatch.setattr(sentiment, "SENTIMENT_CSV", out)
-        sentiment.run(name, model_path if name == "clf" else None)
+        out = tmp_path / util.SENTIMENT_FILE
+        sentiment.run(name, model_path if name == "clf" else None, data_dir=tmp_path)
         with open(out, newline="", encoding="utf-8") as f:
             rows = list(csv.DictReader(f))
         assert list(rows[0]) == sentiment.FIELDS
         assert -1 <= float(rows[0]["compound"]) <= 1
+
+    default_model = tmp_path / util.MODELS_DIR / util.MODEL_FILE
+    default_model.parent.mkdir()
+    default_model.write_bytes(model_path.read_bytes())
+    sentiment.run("clf", data_dir=tmp_path)
 
 
 def test_model_save_load_roundtrip(tmp_path):

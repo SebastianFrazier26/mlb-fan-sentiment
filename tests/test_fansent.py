@@ -129,6 +129,40 @@ def test_alias_guard_hook():
     assert cs.search("PCA rules") and not cs.search("pca rules")
 
 
+_COMMON = [
+    _p("1", "Luke Little"),
+    _p("2", "Connelly Early"),
+    _p("3", "Trevor Story"),
+    _p("4", "Seiya Suzuki"),
+]
+
+
+def test_common_word_surname_needs_capital():
+    assert _ids("a little rough tonight", _COMMON) == []
+    assert _ids("early innings are fine", _COMMON) == []
+    assert _ids("what a story", _COMMON) == []
+    assert _ids("Little blew the save", _COMMON) == ["1"]
+    assert _ids("Early dealt seven strong", _COMMON) == ["2"]
+    assert _ids("Story homered", _COMMON) == ["3"]
+    assert _ids("that was Little's worst outing", _COMMON) == ["1"]
+
+
+def test_common_word_surname_all_caps():
+    assert _ids("LITTLE blew it again", _COMMON) == ["1"]
+    assert _ids("LITTLE BLEW IT AGAIN", _COMMON) == []
+    assert _ids("A LITTLE ROUGH", _COMMON) == []
+
+
+def test_common_word_full_names_unaffected():
+    assert _ids("luke little blew the save", _COMMON) == ["1"]
+    assert _ids("trevor story homered", _COMMON) == ["3"]
+    assert _ids("A LITTLE ROUGH, LUKE LITTLE", _COMMON) == ["1"]
+
+
+def test_non_common_surname_stays_case_insensitive():
+    assert _ids("suzuki is raking", _COMMON) == ["4"]
+
+
 def test_partial_corr_detects_lagged_signal():
     rng = np.random.default_rng(42)
     n = 200

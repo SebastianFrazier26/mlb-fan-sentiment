@@ -22,6 +22,8 @@
 - 2026-10-12T00:00Z [USER] Weekly/mention/week thresholds stay as-is; still unconfirmed assumptions in README.
 - 2026-10-13T00:00Z [USER] Sentiment scorer: own target-aware classifier built from scratch in numpy (masked target/other names, word+char+target-window TF-IDF, L2 multinomial logistic regression, L-BFGS), replacing raw VADER (~39% on draft labels). Baselines kept in the same harness: VADER and VADER + baseball lexicon overlay. Training/eval on real labels deferred until the user adds improvements.
 - 2026-10-13T00:00Z [ASSUMPTION] `na` labels are excluded from training and eval (relevance, not sentiment) rather than a 4th class; revisit if na rows are common in real data.
+- 2026-10-13T00:00Z [USER] A team subreddit fanbase counts ONLY its own team's players (r/CHICubs -> Cubs 112, r/redsox -> Red Sox 111; roster `team_id` from players.csv, so traded players leave the old team's sub). r/baseball and news stay league-wide. `--all-teams` disables for sensitivity checks.
+- 2026-10-13T00:00Z [CODE] Unmapped subreddits are treated as league-wide (not an error) so new/non-team sources work; 28 non-demo entries in team_subreddits.csv are unverified recall.
 
 ## [PROGRESS]
 - 2026-08-18T00:00Z [CODE] Scaffolded ~/Developer/mlb-fan-sentiment: fansent CLI (rosters, stats, reddit-dump, reddit-live, news, score, correlate), tests, Dockerfile, Makefile, README.
