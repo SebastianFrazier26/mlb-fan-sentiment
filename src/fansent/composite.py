@@ -15,8 +15,8 @@ from collections.abc import Mapping
 import pandas as pd
 
 DEFAULT_COMPOSITE_WEIGHTS: dict[str, dict[str, float]] = {
-    "hitter": {"OPS": 1.0, "AVG": 1.0, "FLD_PCT": 1.0, "ERRORS": 1.0},
-    "pitcher": {"ERA": 1.0, "WHIP": 1.0},
+    "hitter": {"OPS": 0.375, "AVG": 0.375, "FLD_PCT": 0.125, "ERRORS": 0.125},
+    "pitcher": {"ERA": 0.5, "WHIP": 0.5},
 }
 ANCHORS = {"hitter": ("OPS", "AVG"), "pitcher": ("ERA", "WHIP")}
 

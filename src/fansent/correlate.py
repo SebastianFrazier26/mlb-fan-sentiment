@@ -7,6 +7,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from .inference import InferenceConfig, MetricResult, analyze_metric
@@ -25,7 +26,17 @@ OAA_OUT = DATA_DIR / "analysis_oaa.csv"
 REDDIT_ATTRIBUTION_CSV = DATA_DIR / "reddit_attribution.csv"
 NEWS_HEADLINES_CSV = DATA_DIR / "news_headlines.csv"
 
+FAMILY_METRICS = "metrics"
+FAMILY_COMPOSITE = "COMPOSITE"
+FAMILY_OAA = "OAA"
+FAMILY_EXPLORATORY = "exploratory"
+FAMILY_ORDER = [FAMILY_COMPOSITE, FAMILY_METRICS, FAMILY_OAA, FAMILY_EXPLORATORY]
+# CS_PCT only has catchers, so it is too thin to correct alongside the rest.
+EXPLORATORY_METRICS = frozenset({"CS_PCT"})
+
 FANBASE_COLS = [
+    "family",
+    "exploratory",
     "metric",
     "fanbase",
     "mu_mean",
@@ -55,11 +66,27 @@ def _read_optional(path: Path) -> pd.DataFrame | None:
     return pd.read_csv(path, dtype=str) if path.exists() else None
 
 
+def family_of(metric: str) -> str:
+    if metric in EXPLORATORY_METRICS:
+        return FAMILY_EXPLORATORY
+    if metric in (FAMILY_COMPOSITE, FAMILY_OAA):
+        return metric
+    return FAMILY_METRICS
+
+
 def correct(df: pd.DataFrame) -> pd.DataFrame:
-    """Add q_bh and p_holm over all (metric x fanbase) tests in df."""
+    """Assign `family`/`exploratory` and add q_bh and p_holm within each family only.
+
+    Exploratory rows keep raw perm_p and get NA corrections."""
     out = df.copy()
-    out["q_bh"] = benjamini_hochberg(out["perm_p"].to_numpy())
-    out["p_holm"] = holm(out["perm_p"].to_numpy())
+    out["family"] = out["metric"].map(family_of)
+    out["exploratory"] = out["family"] == FAMILY_EXPLORATORY
+    out["q_bh"] = np.nan
+    out["p_holm"] = np.nan
+    for idx in out[~out["exploratory"]].groupby("family").groups.values():
+        p = out.loc[idx, "perm_p"].to_numpy()
+        out.loc[idx, "q_bh"] = benjamini_hochberg(p)
+        out.loc[idx, "p_holm"] = holm(p)
     return out
 
 
@@ -114,8 +141,14 @@ def format_table(fb: pd.DataFrame, correction: str, alpha: float) -> str:
     for c in ("mu_mean", "ci_low", "ci_high"):
         t[c] = t[c].map("{:+.3f}".format)
     for c in ("p_pos", "perm_p", "q_bh", "p_holm", "rhat_max"):
-        t[c] = t[c].map("{:.3f}".format)
-    return t.to_string(index=False)
+        t[c] = t[c].map("{:.3f}".format).replace("nan", "NA")
+    blocks = []
+    for fam in FAMILY_ORDER:
+        part = t[t["family"] == fam].drop(columns=["family", "exploratory"])
+        if len(part):
+            note = " (raw perm_p, not corrected)" if fam == FAMILY_EXPLORATORY else ""
+            blocks.append(f"-- family: {fam}{note}\n{part.to_string(index=False)}")
+    return "\n\n".join(blocks)
 
 
 def run(

@@ -81,7 +81,7 @@ def test_planted_effect_detected_and_null_not(e2e):
 def test_unit_table_and_columns(e2e):
     assert set(e2e.units["fanbase"]) == {"CHICubs", "redsox"}
     assert e2e.units["n_obs"].min() >= 8
-    assert list(e2e.fanbases.columns)[:2] == ["metric", "fanbase"]
+    assert list(e2e.fanbases.columns)[:4] == ["family", "exploratory", "metric", "fanbase"]
     assert e2e.oaa_fanbases.empty
 
 

@@ -16,6 +16,10 @@
 - 2026-08-18T00:00Z [TOOL] Docker daemon not running on host -> dev via uv venv; Dockerfile + Make targets provided for the container path.
 - 2026-10-01T00:00Z [USER] Season default = most recent (2026). (CLI defaults changed to 2026 on feat/data-v2.)
 - 2026-10-01T00:00Z [USER] Repo public (Apache-2.0); collectors (reddit_dump, reddit_live, news_gdelt) moved to private repo `fansent-collect` (~/Developer/fansent-collect), which depends on `fansent` via uv editable path source and writes texts.csv / news_tone.csv into ../mlb-fan-sentiment/data (override: --data-dir / FANSENT_DATA_DIR).
+- 2026-10-12T00:00Z [USER] reply_inherited weight default 1.0 (equal to explicit); keep `--reply-weight`.
+- 2026-10-12T00:00Z [USER] Composite weights: hitters OPS 0.375, AVG 0.375, FLD_PCT 0.125, -ERRORS 0.125; pitchers ERA 0.5, WHIP 0.5, no fielding.
+- 2026-10-12T00:00Z [USER] Multiple-comparison families, separate: `metrics` (OPS, AVG, ERA, WHIP, FLD_PCT, ERRORS; BH default, Holm also reported), `COMPOSITE` (headline), `OAA` (secondary); `CS_PCT` exploratory (raw perm_p, no correction). Output has `family`, `exploratory` columns.
+- 2026-10-12T00:00Z [USER] Weekly/mention/week thresholds stay as-is; still unconfirmed assumptions in README.
 
 ## [PROGRESS]
 - 2026-08-18T00:00Z [CODE] Scaffolded ~/Developer/mlb-fan-sentiment: fansent CLI (rosters, stats, reddit-dump, reddit-live, news, score, correlate), tests, Dockerfile, Makefile, README.

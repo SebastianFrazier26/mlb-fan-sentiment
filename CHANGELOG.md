@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-10-12
+
+- Multiple-comparison correction now runs within separate families: `metrics`
+  (OPS/AVG/ERA/WHIP/FLD_PCT/ERRORS), `COMPOSITE`, `OAA`. `CS_PCT` is exploratory (raw
+  `perm_p`, NA `q_bh`/`p_holm`). `analysis_fanbases.csv` gains `family` and `exploratory`
+  columns; the printed table is grouped by family.
+- Default composite weights: hitters OPS 0.375, AVG 0.375, FLD_PCT 0.125, -ERRORS 0.125;
+  pitchers ERA 0.5, WHIP 0.5. `reply_inherited` weight stays 1.0 (`--reply-weight`).
+
 ## 2026-10-02
 
 - `fansent correlate` now fits the hierarchical model per metric (OPS, AVG, ERA, WHIP,

@@ -218,3 +218,12 @@ def test_oaa_panel_consecutive_months_and_cumulative_std():
     assert got["period"].dt.strftime("%m").tolist() == ["04", "08"]
     assert got["perf"].tolist() == [2.0, 1.0] and got["y_next"].tolist() == [-1.0, 4.0]
     assert got["std"].tolist() == [2.0, 1.0 + 2.0 - 1.0]  # cumulative over eligible months
+
+
+def test_default_composite_weights():
+    from fansent.composite import DEFAULT_COMPOSITE_WEIGHTS as W
+
+    assert W["hitter"] == {"OPS": 0.375, "AVG": 0.375, "FLD_PCT": 0.125, "ERRORS": 0.125}
+    assert W["pitcher"] == {"ERA": 0.5, "WHIP": 0.5}
+    assert PanelConfig().composite_weights == W
+    assert PanelConfig().reply_inherited_weight == 1.0

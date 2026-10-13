@@ -72,13 +72,17 @@ Per metric (OPS, AVG, ERA, WHIP, FLD_PCT, ERRORS, CS_PCT, and a COMPOSITE index)
    seeded and independent of worker count. This breaks the sentiment-to-outcome link while
    preserving each unit's marginals; it also breaks the within-unit sentiment-performance link,
    so it is a null for "sentiment carries no information", not for "sentiment merely reacts".
-4. **Multiple comparisons** across all (metric x fanbase) tests in the run: Benjamini-Hochberg
-   `q_bh` and Holm `p_holm` (both hand-implemented; `--correction` picks which one the `*`
-   marker in the printed table uses, default BH).
+4. **Multiple comparisons**, corrected within separate families (Benjamini-Hochberg `q_bh` and
+   Holm `p_holm`, both hand-implemented; `--correction` picks which one the `*` marker in the
+   printed table uses, default BH). Families: `metrics` (OPS, AVG, ERA, WHIP, FLD_PCT, ERRORS x
+   fanbase); `COMPOSITE` (the headline test, corrected only among its own fanbases); `OAA`
+   (secondary). `CS_PCT` is `exploratory`: raw `perm_p` only, `q_bh`/`p_holm` are NA and it is
+   excluded from every family. The `family` and `exploratory` columns record this, and the
+   printed table is grouped by family.
 5. **COMPOSITE.** Per metric, oriented values are z-scored pooled over eligible player-weeks;
    a player-week's composite is the weighted mean of the z-scores available that week
-   (hitters: OPS, AVG, FLD_PCT, -ERRORS; pitchers: ERA, WHIP; equal weights, configurable in
-   `PanelConfig.composite_weights`). Its season-to-date control is built the same way from
+   (hitters: OPS 0.375, AVG 0.375, FLD_PCT 0.125, -ERRORS 0.125; pitchers: ERA 0.5, WHIP 0.5,
+   no fielding; configurable in `PanelConfig.composite_weights`). Its season-to-date control is built the same way from
    `std_value`. Role = hitter if the player ever reached 20 PA, else pitcher. A week needs a
    hitting/pitching metric, so fielding alone never forms a composite. The composite has no
    sample-size weight.
@@ -87,13 +91,14 @@ Per metric (OPS, AVG, ERA, WHIP, FLD_PCT, ERRORS, CS_PCT, and a COMPOSITE index)
    permutation, weighted by next-month attempts. Monthly data gives ~5 points per unit, too few
    for per-unit partial correlations, so the hierarchical pooling is used instead.
 
-Defaults, all unconfirmed assumptions rather than tuned values: weekly minimum sample
+Thresholds below are unconfirmed assumptions rather than tuned values (composite weights, the
+reply weight and the correction families are user decisions of 2026-10-12): weekly minimum sample
 OPS/AVG 10 (PA/AB), ERA/WHIP 3 IP, FLD_PCT/ERRORS 3 chances, CS_PCT 2 attempts; >= 3 mentions
 per player-week; >= 8 weeks per unit; >= 3 units per (metric, fanbase); `reply_inherited`
-mentions weigh the same as explicit ones (`--reply-weight`); OAA months need >= 10 mentions,
+mentions weigh the same as explicit ones (`--reply-weight`, user decision 2026-10-12); OAA months need >= 10 mentions,
 >= 10 attempts, >= 3 months per unit.
 
-Outputs: `analysis_fanbases.csv` (`metric, fanbase, mu_mean, ci_low, ci_high, p_pos, perm_p,
+Outputs: `analysis_fanbases.csv` (`family, exploratory, metric, fanbase, mu_mean, ci_low, ci_high, p_pos, perm_p,
 q_bh, p_holm, n_units, n_obs, rhat_max`), `analysis_units.csv` (per-unit shrunk effects),
 `analysis_oaa.csv` / `analysis_oaa_units.csv`. `--method partial` runs the legacy per-pair
 partial correlation (OPS/ERA only, `analysis_players.csv`, `analysis_fanbases_partial.csv`) for
