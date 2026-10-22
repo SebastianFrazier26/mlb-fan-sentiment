@@ -45,8 +45,11 @@ TOP_KEYS = {
     "perm_b",
     "alpha",
     "correction",
+    "status",
     "rows",
 }
+STATUSES = ("preliminary", "final")
+RUN_DATE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})")
 FLOAT_KEYS = ("mu_mean", "ci_low", "ci_high", "p_pos", "perm_p", "rhat_max")
 NULLABLE_FLOAT_KEYS = ("q_bh", "p_holm")
 INT_KEYS = ("n_units", "n_obs")
@@ -63,7 +66,12 @@ def _num(v) -> float | None:
 
 
 def snapshot_from_run(
-    run_dir: Path, run_id: str, season: int, perm_b: int, alpha: float = 0.05
+    run_dir: Path,
+    run_id: str,
+    season: int,
+    perm_b: int,
+    alpha: float = 0.05,
+    status: str = "preliminary",
 ) -> dict:
     df = pd.read_csv(run_dir / FANBASES_OUT)
     rows = []
@@ -88,6 +96,7 @@ def snapshot_from_run(
         "perm_b": perm_b,
         "alpha": alpha,
         "correction": "bh",
+        "status": status,
         "rows": rows,
     }
     validate_snapshot(snap)
@@ -121,6 +130,8 @@ def validate_snapshot(snap: dict) -> None:
             raise SnapshotError(f"{k} must be in (0, 1)")
     if snap["correction"] not in ("bh", "holm"):
         raise SnapshotError("correction must be 'bh' or 'holm'")
+    if snap["status"] not in STATUSES:
+        raise SnapshotError(f"status must be one of {STATUSES}")
     rows = snap["rows"]
     if not isinstance(rows, list) or not rows:
         raise SnapshotError("rows must be a non-empty list")
@@ -481,15 +492,17 @@ CSS = (
 :root{color-scheme:light;--bg:#fcfcfb;--panel:#f4f3ef;--ink:#0b0b0b;--ink2:#52514e;
 --muted:#6f6d68;--grid:#e1e0d9;--axis:#c3c2b7;--ring:rgba(11,11,11,.10);--link:#1c5cab;
 --s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--s5:#e87ba4;--s6:#008300;--s7:#6250d6;
---s8:#e34948}
+--s8:#e34948;--warn-bg:#fdf3dc;--warn-line:#d9a227;--warn-ink:#7a5200}
 @media (prefers-color-scheme:dark){:root:where(:not([data-theme="light"])){color-scheme:dark;
 --bg:#1a1a19;--panel:#222220;--ink:#f0efec;--ink2:#c3c2b7;--muted:#9b9a94;--grid:#2c2c2a;
 --axis:#55554f;--ring:rgba(255,255,255,.10);--link:#86b6ef;--s1:#3987e5;--s2:#d95926;
---s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300;--s7:#9085e9;--s8:#e66767}}
+--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300;--s7:#9085e9;--s8:#e66767;
+--warn-bg:#2e2716;--warn-line:#a87f1f;--warn-ink:#f0c45a}}
 :root[data-theme="dark"]{color-scheme:dark;--bg:#1a1a19;--panel:#222220;--ink:#f0efec;
 --ink2:#c3c2b7;--muted:#9b9a94;--grid:#2c2c2a;--axis:#55554f;--ring:rgba(255,255,255,.10);
 --link:#86b6ef;--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;
---s6:#008300;--s7:#9085e9;--s8:#e66767}
+--s6:#008300;--s7:#9085e9;--s8:#e66767;--warn-bg:#2e2716;--warn-line:#a87f1f;
+--warn-ink:#f0c45a}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);
 font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
@@ -498,6 +511,13 @@ h1{font-size:1.9rem;line-height:1.2;margin:.2em 0 .3em;letter-spacing:-.01em}
 h2{font-size:1.2rem;margin:2.2em 0 .5em}
 p,li{color:var(--ink2)}
 a{color:var(--link)}
+.prelim{display:flex;gap:12px;align-items:flex-start;margin:0 0 22px;padding:12px 14px;
+background:var(--warn-bg);border:1px solid var(--warn-line);border-left-width:4px;
+border-radius:8px}
+.prelim p{margin:0;color:var(--ink);font-size:.95rem}
+.badge{flex:none;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+color:var(--warn-ink);border:1px solid var(--warn-line);border-radius:999px;padding:2px 9px;
+margin-top:1px;white-space:nowrap}
 .kicker{font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0}
 .lede{font-size:1.08rem}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:20px 0}
@@ -549,9 +569,24 @@ dt{font-weight:600}
 dd{margin:0;color:var(--ink2)}
 footer{margin-top:3em;font-size:.85rem;color:var(--muted);border-top:1px solid var(--grid);
 padding-top:12px}
-@media (max-width:520px){dl{grid-template-columns:1fr}dd{margin-bottom:6px}}
+@media (max-width:520px){dl{grid-template-columns:1fr}dd{margin-bottom:6px}
+.prelim{padding:10px 12px;margin-bottom:16px}.prelim p{font-size:.88rem}.badge{display:none}}
 """
 )
+
+
+def _status_banner(snap: dict) -> str:
+    if snap["status"] == "final":
+        return ""
+    m = RUN_DATE_RE.match(snap["run_id"])
+    run = f"the {m.group(1)} run" if m else f"run {E(snap['run_id'])}"
+    return (
+        '<aside class="prelim" role="note" aria-label="Preliminary results">'
+        '<span class="badge">Preliminary</span>'
+        f"<p><strong>Preliminary results</strong> from {run}, scored with the baseline "
+        "sentiment scorer before the target-aware classifier is trained. "
+        "These numbers will change.</p></aside>"
+    )
 
 
 def render_html(snap: dict) -> str:
@@ -574,13 +609,14 @@ def render_html(snap: dict) -> str:
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Are the Fans Right?</title>
+<title>Are the Fans Right?{" (preliminary)" if snap["status"] == "preliminary" else ""}</title>
 <meta name="description" content="Does fan sentiment predict next-week MLB performance? \
 Hierarchical Bayesian results for {E(fb_list)}, {snap["season"]} season.">
 <style>{CSS}</style>
 </head>
 <body>
 <main>
+{_status_banner(snap)}
 <p class="kicker">fansent &middot; {snap["season"]} season &middot; run {E(snap["run_id"])}</p>
 <h1>Are the fans always right?</h1>
 <p class="lede">When a fanbase is upbeat about a player one week, does that player actually play

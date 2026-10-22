@@ -52,7 +52,7 @@ def test_committed_snapshots_are_valid_and_aggregate_only():
     paths = sorted(PUBLISHED.glob("*.json"))
     assert paths
     allowed = set(site.KNOWN_METRICS) | set(site.KNOWN_FAMILIES) | site.TOP_KEYS | site.ROW_KEYS
-    allowed |= {"bh", "holm"}
+    allowed |= {"bh", "holm", *site.STATUSES}
     for path in paths:
         snap = site.load_snapshot(path)
         assert path.stem == snap["run_id"]
@@ -98,6 +98,9 @@ def test_snapshot_ignores_extra_run_columns(tmp_path):
         lambda s: s.update(created="yesterday"),
         lambda s: s.update(perm_b=999),
         lambda s: s.update(rows=[]),
+        lambda s: s.update(status="draft"),
+        lambda s: s.update(status=None),
+        lambda s: s.pop("status"),
     ],
 )
 def test_validate_rejects(snap, mutate):
@@ -121,6 +124,26 @@ def test_render_html_sections_and_no_script(snap):
     assert "Caught stealing %" in page
 
 
+def test_status_defaults_to_preliminary_and_drives_banner(snap):
+    assert snap["status"] == "preliminary"
+    page = site.render_html(snap)
+    assert 'class="prelim"' in page and "<strong>Preliminary results</strong>" in page
+    assert (
+        "the 2026-10-13 run" in page
+        and "baseline sentiment scorer" in page
+        and "will change" in page
+    )
+    assert "<title>Are the Fans Right? (preliminary)</title>" in page
+    assert 'id="h-caveats"' in page
+    final = site.render_html({**snap, "status": "final"})
+    assert 'class="prelim"' not in final and "(preliminary)" not in final
+
+
+def test_banner_without_dated_run_id_names_the_run(snap):
+    page = site.render_html({**snap, "run_id": "teams-clean"})
+    assert "run teams-clean" in page
+
+
 def test_render_escapes_labels(snap):
     snap["run_id"] = "a<b"
     with pytest.raises(SnapshotError):
@@ -138,7 +161,9 @@ def test_cli_site_builds_from_snapshot(snap, tmp_path, capsys):
 def test_cli_snapshot(tmp_path):
     d = _run_dir(tmp_path)
     cli.main(["snapshot", str(d), "--out-dir", str(tmp_path / "pub")])
-    assert (tmp_path / "pub" / "run.json").exists()
+    assert site.load_snapshot(tmp_path / "pub" / "run.json")["status"] == "preliminary"
+    cli.main(["snapshot", str(d), "--status", "final", "--out-dir", str(tmp_path / "fin")])
+    assert site.load_snapshot(tmp_path / "fin" / "run.json")["status"] == "final"
 
 
 def test_latest_snapshot_picks_newest_run(snap, tmp_path):

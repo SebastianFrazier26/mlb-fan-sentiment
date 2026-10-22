@@ -120,6 +120,12 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--run-id", help="Snapshot id (default: the run directory's name)")
     p.add_argument("--season", type=int, default=2026)
     p.add_argument("--perm-b", type=int, default=1000, help="--perm-b the run used")
+    p.add_argument(
+        "--status",
+        choices=["preliminary", "final"],
+        default="preliminary",
+        help="final drops the site's preliminary banner",
+    )
     p.add_argument("--alpha", type=float, default=0.05)
     p.add_argument("--out-dir", default="results/published")
 
@@ -169,7 +175,12 @@ def main(argv: list[str] | None = None) -> None:
 
         run_dir = Path(args.run_dir)
         snap = site.snapshot_from_run(
-            run_dir, args.run_id or run_dir.resolve().name, args.season, args.perm_b, args.alpha
+            run_dir,
+            args.run_id or run_dir.resolve().name,
+            args.season,
+            args.perm_b,
+            args.alpha,
+            args.status,
         )
         print(f"wrote {site.write_snapshot(snap, Path(args.out_dir))}")
     elif args.command == "site":

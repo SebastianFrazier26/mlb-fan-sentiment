@@ -2,6 +2,11 @@
 
 ## 2026-10-22
 
+- Results site: snapshots carry a required `status` (`preliminary` | `final`, validated;
+  `fansent snapshot --status`, default `preliminary`). Preliminary snapshots render a
+  "Preliminary results" banner at the top of the page (run date, baseline sentiment scorer,
+  target-aware classifier not yet trained, numbers will change) and a "(preliminary)" title
+  suffix; `final` drops both. `2026-10-13-teams-clean` is marked preliminary.
 - Results site: `fansent snapshot RUN_DIR [--run-id ID] [--perm-b 1000]` writes an
   aggregate-only, schema-validated `results/published/<run-id>.json` from a run's
   `analysis_fanbases.csv`; `fansent site [--snapshot PATH] [--out site]` renders a static,
