@@ -10,7 +10,8 @@ import numpy as np
 
 from . import softmax
 from .data import LABELS, Example
-from .features import FeatureConfig, Vectorizer
+from .embeddings import FastTextVectors, TokenVectors
+from .features import FeatureConfig, Prepped, Vectorizer
 from .text import Masker, tokenize
 
 CLASSES = LABELS  # column order of predict_proba: neg, neu, pos
@@ -30,20 +31,28 @@ class ClfConfig:
 
 
 class SentimentClassifier:
-    def __init__(self, config: ClfConfig | None = None, masker: Masker | None = None) -> None:
+    def __init__(
+        self,
+        config: ClfConfig | None = None,
+        masker: Masker | None = None,
+        vectors: TokenVectors | None = None,
+    ) -> None:
         self.config = config or ClfConfig()
         self.masker = masker or Masker()
-        self.vectorizer = Vectorizer(self.config.features)
+        self.vectorizer = Vectorizer(self.config.features, vectors)
         self.w: np.ndarray | None = None
         self.b: np.ndarray | None = None
 
-    def prep(self, examples: list[Example]) -> list[list[str]]:
-        return [
-            tokenize(
-                self.masker.mask(e.text, name=e.player, player_id=e.player_id, aliases=e.aliases)
-            )
-            for e in examples
-        ]
+    def prep(self, examples: list[Example]) -> list[Prepped]:
+        def mask(text: str, e: Example) -> str:
+            return self.masker.mask(text, name=e.player, player_id=e.player_id, aliases=e.aliases)
+
+        out = []
+        for e in examples:
+            masked = mask(e.text, e)
+            parent = tokenize(mask(e.parent_text, e)) if e.parent_text else []
+            out.append(Prepped(tokenize(masked), masked, parent))
+        return out
 
     def fit(self, examples: list[Example]) -> SentimentClassifier:
         y = np.array([CLASSES.index(e.label) for e in examples])
@@ -74,14 +83,26 @@ class SentimentClassifier:
         for name, blk in self.vectorizer.blocks.items():
             arrays[f"terms_{name}"] = np.array(blk.terms, dtype=str)
             arrays[f"idf_{name}"] = blk.idf
+        if self.vectorizer.vectors is not None:
+            arrays["emb_tokens"], arrays["emb_vecs"] = self.vectorizer.vectors.export()
         np.savez_compressed(path, **arrays)
 
     @classmethod
-    def load(cls, path: Path, masker: Masker | None = None) -> SentimentClassifier:
+    def load(
+        cls, path: Path, masker: Masker | None = None, provider: FastTextVectors | None = None
+    ) -> SentimentClassifier:
+        """``provider`` (the fastText .bin) is only needed for tokens unseen in training; the
+        model file carries the vectors of every token cached at save time."""
         with np.load(path, allow_pickle=False) as z:
             if tuple(z["classes"].tolist()) != CLASSES:
                 raise ValueError(f"{path}: class order {z['classes'].tolist()} != {CLASSES}")
-            model = cls(ClfConfig.from_dict(json.loads(str(z["config"]))), masker)
+            config = ClfConfig.from_dict(json.loads(str(z["config"])))
+            vectors = None
+            if config.features.emb:
+                vectors = TokenVectors.from_export(
+                    z["emb_tokens"].tolist(), z["emb_vecs"], provider
+                )
+            model = cls(config, masker, vectors)
             model.w, model.b = z["w"], z["b"]
             for name, blk in model.vectorizer.blocks.items():
                 blk.terms = z[f"terms_{name}"].tolist()

@@ -1,5 +1,5 @@
 """Labeled-example loading. Label files are CSVs: text, player, player_id, final_label |
-draft_label, optional aliases (';'-separated). Other columns (parent_text, ...) are ignored."""
+draft_label, optional aliases (';'-separated), optional parent_text (reply context). Other columns are ignored."""
 
 from __future__ import annotations
 
@@ -32,6 +32,7 @@ class Example:
     player_id: str = ""
     aliases: tuple[str, ...] = ()
     label: str | None = None
+    parent_text: str = ""
 
 
 def normalize_label(raw: str) -> str:
@@ -68,6 +69,7 @@ def load_labeled(paths: list[Path]) -> tuple[list[Example], int]:
                         player_id=str(row.get("player_id") or ""),
                         aliases=aliases,
                         label=label,
+                        parent_text=(row.get("parent_text") or "").strip(),
                     )
                 )
     return out, n_na

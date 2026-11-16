@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-11-15
+
+- Classifier: three optional, toggleable feature blocks (`clf-eval` / `clf-train` flags
+  `--emb`, `--lex`, `--parent`), stacked with the TF-IDF blocks via `scipy.sparse.hstack` with
+  per-block weights that join the CV grid (`--emb-weights`, `--lex-weights`, `--parent-weights`).
+  `--emb`: mean fastText vectors of the masked comment and of the +-4 target window
+  (placeholders excluded, unit-normalised). `--lex`: baseball-lexicon VADER compound of the
+  comment and of the target window plus log counts of positive/negative lexicon hits.
+  `--parent`: TF-IDF of the parent comment (masked for the same target) plus an `is_reply` flag.
+  Labeled CSVs may now carry `parent_text`. Saved models include the token vectors they used,
+  so scoring does not need the fastText file for tokens seen in training. Old `clf.npz` files load.
+- New `fansent clf-fetch-embeddings`: downloads (resumable) and extracts the official fastText
+  `crawl-300d-2M-subword` model into `<data-dir>/embeddings/` (5.8 GB download, 7.2 GB `.bin`).
+  The `.bin` is read by our own reader (`classifier/embeddings.py`; subword hashing included),
+  so there is no `fasttext` package dependency.
+
 ## 2026-10-13
 
 - New `fansent label --file <csv> [--port 8765] [--open]`: a local labeling page (stdlib

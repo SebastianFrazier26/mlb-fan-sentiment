@@ -46,6 +46,15 @@ is unchanged.
   multinomial logistic regression with balanced class weights, fit by L-BFGS on our own
   loss/gradient. Score = P(pos) - P(neg).
 
+Optional feature blocks (each off by default, combinable, weights tuned by CV on the
+training data only): `--lex` adds baseball-lexicon scores, `--parent` adds the parent
+comment's TF-IDF plus an `is_reply` flag (needs a `parent_text` column in the labeled CSV),
+and `--emb` adds mean fastText vectors of the comment and the target window. `--emb` needs the
+pretrained model once: `uv run fansent clf-fetch-embeddings` (5.8 GB download, 7.2 GB on disk
+in `<data-dir>/embeddings/`, gitignored; `--emb-path` points elsewhere). Out-of-vocabulary
+words get vectors from their character n-grams, via our own reader of the `.bin` format.
+`fansent score` does not yet pass parent text, so `--parent` models see every row as a non-reply.
+
 Labeled CSV schema (`text, player, player_id, final_label` or `draft_label`, optional
 `aliases` as `;`-separated nicknames; `na` rows are excluded from training and evaluation):
 

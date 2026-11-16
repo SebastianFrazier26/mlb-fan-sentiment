@@ -42,3 +42,11 @@ class LexiconVader:
 
     def compound(self, text: str) -> float:
         return self.analyzer.polarity_scores(self.rewrite(text))["compound"]
+
+    def hits(self, text: str) -> tuple[int, int]:
+        """(# positive-valence entries, # negative-valence entries) matched in the text."""
+        if not self._pattern:
+            return 0, 0
+        text = text.replace("’", "'")
+        vals = [self.entries[m.group(0).lower()] for m in self._pattern.finditer(text)]
+        return sum(v > 0 for v in vals), sum(v < 0 for v in vals)

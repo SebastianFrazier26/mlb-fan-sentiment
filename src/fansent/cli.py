@@ -56,6 +56,15 @@ def main(argv: list[str] | None = None) -> None:
         )
         p.add_argument("--char-ngrams", nargs="+", default=["0-0", "3-5"], help="lo-hi; 0-0 = off")
         p.add_argument("--word-ngrams", nargs="+", default=["1-2"])
+        p.add_argument("--emb", action="store_true", help="Add fastText mean-vector block")
+        p.add_argument("--lex", action="store_true", help="Add lexicon-score block")
+        p.add_argument("--parent", action="store_true", help="Add parent-text block + is_reply")
+        p.add_argument(
+            "--emb-path", help="fastText .bin (default: <data-dir>/embeddings/<crawl-300d-2M>.bin)"
+        )
+        p.add_argument("--emb-weights", type=float, nargs="+", default=[1.0, 2.0])
+        p.add_argument("--lex-weights", type=float, nargs="+", default=[1.0, 2.0])
+        p.add_argument("--parent-weights", type=float, nargs="+", default=[0.5, 1.0])
 
     p = sub.add_parser(
         "clf-eval", help="Train on labeled CSVs, compare vader/lexicon/clf on a test CSV"
@@ -69,6 +78,12 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--train", nargs="+", required=True)
     p.add_argument("--out", help="Model path (default: <data-dir>/models/clf.npz)")
     add_grid(p)
+
+    p = sub.add_parser(
+        "clf-fetch-embeddings",
+        help="Download the official fastText crawl-300d-2M-subword model (~5.8 GB zip, 7.2 GB bin)",
+    )
+    p.add_argument("--keep-zip", action="store_true")
 
     p = sub.add_parser("label", help="Label a sentiment-eval CSV in a local browser page")
     p.add_argument(
@@ -131,20 +146,45 @@ def main(argv: list[str] | None = None) -> None:
         from . import sentiment
 
         sentiment.run(args.scorer, Path(args.model) if args.model else None, data_dir)
+    elif args.command == "clf-fetch-embeddings":
+        from .classifier import embeddings
+
+        embeddings.fetch(data_dir / embeddings.EMBEDDINGS_DIR, keep_zip=args.keep_zip)
     elif args.command in ("clf-eval", "clf-train"):
-        from .classifier import evaluate
+        from .classifier import embeddings, evaluate
+        from .classifier.features import FeatureConfig
+        from .classifier.pipeline import ClfConfig
 
         grid = evaluate.Grid(
-            tuple(args.Cs), tuple(args.windows), tuple(args.char_ngrams), tuple(args.word_ngrams)
+            tuple(args.Cs),
+            tuple(args.windows),
+            tuple(args.char_ngrams),
+            tuple(args.word_ngrams),
+            tuple(args.emb_weights),
+            tuple(args.lex_weights),
+            tuple(args.parent_weights),
         )
+        base = ClfConfig(features=FeatureConfig(emb=args.emb, lex=args.lex, parent=args.parent))
+        vectors = None
+        if args.emb:
+            bin_path = (
+                Path(args.emb_path)
+                if args.emb_path
+                else data_dir / embeddings.EMBEDDINGS_DIR / embeddings.DEFAULT_BIN
+            )
+            if not bin_path.exists():
+                parser.error(f"{bin_path} not found; run `fansent clf-fetch-embeddings` first")
+            vectors = embeddings.TokenVectors(embeddings.FastTextVectors(bin_path))
         train = [Path(t) for t in args.train]
         players = Path(args.players) if args.players else data_dir / PLAYERS_FILE
         if args.command == "clf-eval":
             save = Path(args.save_model) if args.save_model else None
-            evaluate.run_eval(train, Path(args.test), players, args.cv, grid, args.seed, save)
+            evaluate.run_eval(
+                train, Path(args.test), players, args.cv, grid, args.seed, save, base, vectors
+            )
         else:
             out = Path(args.out) if args.out else data_dir / MODELS_DIR / MODEL_FILE
-            evaluate.run_train(train, out, players, args.cv, grid, args.seed)
+            evaluate.run_train(train, out, players, args.cv, grid, args.seed, base, vectors)
     elif args.command == "label":
         from . import label
 
