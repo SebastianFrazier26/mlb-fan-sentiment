@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-11-16
+
+- `fansent score --scorer clf` with a `--parent` model now scores `reply_inherited` rows
+  (per `reddit_attribution.csv`) with their parent comment, via the new optional sidecar
+  `parent_texts.csv` (`parent_id, text`), truncated to 300 characters. Explicit rows stay
+  non-replies. If the sidecar is missing or lacks parents, those rows fall back to non-reply
+  scoring with a stderr warning giving the count. `texts.csv` and `sentiment.csv` unchanged.
+
 ## 2026-11-15
 
 - Classifier: three optional, toggleable feature blocks (`clf-eval` / `clf-train` flags

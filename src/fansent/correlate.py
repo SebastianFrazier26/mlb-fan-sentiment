@@ -20,13 +20,19 @@ from .panel import (
     filter_own_team,
     sentiment_periods,
 )
-from .util import DEFAULT_DATA_DIR, OAA_FILE, PLAYERS_FILE, SENTIMENT_FILE, STATS_FILE
+from .util import (
+    DEFAULT_DATA_DIR,
+    OAA_FILE,
+    PLAYERS_FILE,
+    REDDIT_ATTRIBUTION_FILE,
+    SENTIMENT_FILE,
+    STATS_FILE,
+)
 
 FANBASES_OUT = "analysis_fanbases.csv"
 UNITS_OUT = "analysis_units.csv"
 OAA_OUT = "analysis_oaa.csv"
 OAA_UNITS_OUT = "analysis_oaa_units.csv"
-REDDIT_ATTRIBUTION_FILE = "reddit_attribution.csv"
 NEWS_HEADLINES_FILE = "news_headlines.csv"
 
 FAMILY_METRICS = "metrics"

@@ -53,7 +53,8 @@ and `--emb` adds mean fastText vectors of the comment and the target window. `--
 pretrained model once: `uv run fansent clf-fetch-embeddings` (5.8 GB download, 7.2 GB on disk
 in `<data-dir>/embeddings/`, gitignored; `--emb-path` points elsewhere). Out-of-vocabulary
 words get vectors from their character n-grams, via our own reader of the `.bin` format.
-`fansent score` does not yet pass parent text, so `--parent` models see every row as a non-reply.
+`fansent score` feeds `--parent` models the parent text of `reply_inherited` rows (see
+"Where the text data comes from"); explicit rows are non-replies, as in training.
 
 Labeled CSV schema (`text, player, player_id, final_label` or `draft_label`, optional
 `aliases` as `;`-separated nicknames; `na` rows are excluded from training and evaluation):
@@ -85,6 +86,11 @@ Reddit and news collection lives in a separate, private companion repo
 - `reddit_attribution.csv` (optional) — `text_id, player_id, attribution, parent_id`;
   `attribution` is `explicit` or `reply_inherited` (player named in the parent comment)
 - `news_headlines.csv` (optional) — `text_id, player_id, url, domain, attribution, seendate`
+- `parent_texts.csv` (optional) — `parent_id, text`; the comment each `reply_inherited` row
+  replies to (`parent_id` as in `reddit_attribution.csv`). Only `fansent score --scorer clf`
+  with a `--parent` model reads it: matching rows get `is_reply=1` and the parent-text block,
+  truncated to the first 300 characters (the `parent_text` length of the training samples).
+  Without it, those rows are scored as non-replies and a warning gives how many.
 
 A missing sidecar means every mention counts as explicit. `fansent score` turns `texts.csv`
 into `sentiment.csv` (VADER compound per text x player).
