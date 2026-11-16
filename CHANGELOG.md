@@ -2,6 +2,13 @@
 
 ## 2026-11-16
 
+- Relevance filter: `clf-train` / `clf-eval --task relevance` train a second classifier that
+  predicts whether a matched comment is about the matched player (`na`: surname collision with
+  a non-roster player, ordinary word, pun). `fansent score` loads
+  `<data-dir>/models/relevance.npz` if present (`--relevance-model`, `--no-relevance`), drops
+  rows predicted `na` before scoring, prints kept/dropped per subreddit, and writes the audit
+  sidecar `relevance.csv` (`text_id, player_id, p_relevant, kept`). `sentiment.csv` unchanged.
+  `Example` gains `subreddit`; `load_labeled(keep_na=True)`.
 - `fansent score --scorer clf` with a `--parent` model now scores `reply_inherited` rows
   (per `reddit_attribution.csv`) with their parent comment, via the new optional sidecar
   `parent_texts.csv` (`parent_id, text`), truncated to 300 characters. Explicit rows stay

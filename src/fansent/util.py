@@ -19,9 +19,11 @@ TEXTS_FILE = "texts.csv"
 REDDIT_ATTRIBUTION_FILE = "reddit_attribution.csv"
 PARENT_TEXTS_FILE = "parent_texts.csv"
 SENTIMENT_FILE = "sentiment.csv"
+RELEVANCE_FILE = "relevance.csv"
 NEWS_TONE_FILE = "news_tone.csv"
 MODELS_DIR = "models"
 MODEL_FILE = "clf.npz"
+RELEVANCE_MODEL_FILE = "relevance.npz"
 
 
 def resolve_data_dir(cli_value: str | None = None) -> Path:

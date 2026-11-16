@@ -5,7 +5,14 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .util import ENV_VAR, MODEL_FILE, MODELS_DIR, PLAYERS_FILE, resolve_data_dir
+from .util import (
+    ENV_VAR,
+    MODEL_FILE,
+    MODELS_DIR,
+    PLAYERS_FILE,
+    RELEVANCE_MODEL_FILE,
+    resolve_data_dir,
+)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -42,6 +49,30 @@ def main(argv: list[str] | None = None) -> None:
         "--model",
         help="Model .npz from clf-train (--scorer clf; default: <data-dir>/models/clf.npz)",
     )
+    p.add_argument(
+        "--relevance-model",
+        help="Relevance model .npz (clf-train --task relevance); rows it predicts 'na' are "
+        "dropped and audited in relevance.csv (default: <data-dir>/models/relevance.npz if present)",
+    )
+    p.add_argument(
+        "--no-relevance", action="store_true", help="Score every matched row, no relevance filter"
+    )
+
+    def add_task(p):
+        p.add_argument(
+            "--task",
+            choices=["sentiment", "relevance"],
+            default="sentiment",
+            help="relevance = predict whether a matched comment is about the matched player",
+        )
+        p.add_argument(
+            "--operating-point",
+            choices=["f1", "precision"],
+            default="precision",
+            help="relevance threshold: max na-F1, or the lowest threshold with CV precision "
+            ">= --min-precision",
+        )
+        p.add_argument("--min-precision", type=float, default=0.8)
 
     def add_grid(p):
         p.add_argument(
@@ -72,11 +103,22 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--train", nargs="+", required=True)
     p.add_argument("--test", required=True)
     p.add_argument("--save-model", help="Also save the trained model here")
+    p.add_argument(
+        "--holdout",
+        type=float,
+        default=0.15,
+        help="relevance only: fraction of --train held out before tuning for the Sonnet-split report",
+    )
+    add_task(p)
     add_grid(p)
 
     p = sub.add_parser("clf-train", help="Train the classifier and save the model artifact")
     p.add_argument("--train", nargs="+", required=True)
-    p.add_argument("--out", help="Model path (default: <data-dir>/models/clf.npz)")
+    p.add_argument(
+        "--out",
+        help="Model path (default: <data-dir>/models/clf.npz, or relevance.npz for --task relevance)",
+    )
+    add_task(p)
     add_grid(p)
 
     p = sub.add_parser(
@@ -145,11 +187,40 @@ def main(argv: list[str] | None = None) -> None:
     elif args.command == "score":
         from . import sentiment
 
-        sentiment.run(args.scorer, Path(args.model) if args.model else None, data_dir)
+        sentiment.run(
+            args.scorer,
+            Path(args.model) if args.model else None,
+            data_dir,
+            Path(args.relevance_model) if args.relevance_model else None,
+            not args.no_relevance,
+        )
     elif args.command == "clf-fetch-embeddings":
         from .classifier import embeddings
 
         embeddings.fetch(data_dir / embeddings.EMBEDDINGS_DIR, keep_zip=args.keep_zip)
+    elif args.command in ("clf-eval", "clf-train") and args.task == "relevance":
+        from .classifier import relevance_eval
+
+        players = Path(args.players) if args.players else data_dir / PLAYERS_FILE
+        grid = relevance_eval.RelGrid()
+        point = (args.operating_point, args.min_precision)
+        train = [Path(t) for t in args.train]
+        if args.command == "clf-eval":
+            save = Path(args.save_model) if args.save_model else None
+            relevance_eval.run_eval(
+                train,
+                Path(args.test),
+                players,
+                args.cv,
+                grid,
+                args.seed,
+                save,
+                args.holdout,
+                *point,
+            )
+        else:
+            out = Path(args.out) if args.out else data_dir / MODELS_DIR / RELEVANCE_MODEL_FILE
+            relevance_eval.run_train(train, out, players, args.cv, grid, args.seed, *point)
     elif args.command in ("clf-eval", "clf-train"):
         from .classifier import embeddings, evaluate
         from .classifier.features import FeatureConfig

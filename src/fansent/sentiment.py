@@ -16,6 +16,8 @@ from .util import (
     PARENT_TEXTS_FILE,
     PLAYERS_FILE,
     REDDIT_ATTRIBUTION_FILE,
+    RELEVANCE_FILE,
+    RELEVANCE_MODEL_FILE,
     SENTIMENT_FILE,
     TEXTS_FILE,
     read_csv,
@@ -28,6 +30,7 @@ PARENT_MAX_CHARS = 300
 REPLY_INHERITED = "reply_inherited"
 
 FIELDS = ["text_id", "source", "subreddit", "date", "player_id", "player_name", "compound"]
+RELEVANCE_FIELDS = ["text_id", "player_id", "p_relevant", "kept"]
 
 
 def _read_optional(path: Path) -> list[dict]:
@@ -61,13 +64,65 @@ def parent_texts_for(texts: list[dict], data_dir: Path) -> tuple[list[str], int]
     return out, missing
 
 
+def relevance_filter(
+    texts: list[dict], model_path: Path, players: list[dict], data_dir: Path
+) -> list[dict]:
+    """Drop rows the relevance model calls 'na'; write the audit sidecar; return kept rows."""
+    from .classifier.relevance import RelevanceClassifier
+
+    model = RelevanceClassifier.load(model_path, players)
+    parents, _ = parent_texts_for(texts, data_dir)
+    examples = [
+        Example(
+            text=t["text"],
+            player=t["player_name"],
+            player_id=str(t["player_id"]),
+            parent_text=p,
+            subreddit=t.get("subreddit") or "",
+        )
+        for t, p in zip(texts, parents, strict=True)
+    ]
+    p_na = model.p_na(examples)
+    drop = p_na >= model.config.threshold
+    write_csv(
+        data_dir / RELEVANCE_FILE,
+        [
+            {
+                "text_id": t["text_id"],
+                "player_id": t["player_id"],
+                "p_relevant": round(1.0 - float(p), 4),
+                "kept": int(not d),
+            }
+            for t, p, d in zip(texts, p_na, drop, strict=True)
+        ],
+        RELEVANCE_FIELDS,
+    )
+    kept = {s: [0, 0] for s in sorted({t["subreddit"] for t in texts})}
+    for t, d in zip(texts, drop, strict=True):
+        kept[t["subreddit"]][int(d)] += 1
+    print(f"Relevance filter ({model_path.name}, drop P(na) >= {model.config.threshold:.3f}):")
+    for sub, (k, d) in kept.items():
+        print(f"  {sub or '(none)':<12} kept {k:>7}  dropped {d:>7}  ({d / max(1, k + d):.1%})")
+    return [t for t, d in zip(texts, drop, strict=True) if not d]
+
+
 def run(
-    scorer: str = "vader", model: Path | None = None, data_dir: Path = DEFAULT_DATA_DIR
+    scorer: str = "vader",
+    model: Path | None = None,
+    data_dir: Path = DEFAULT_DATA_DIR,
+    relevance_model: Path | None = None,
+    use_relevance: bool = True,
 ) -> None:
     texts = read_csv(data_dir / TEXTS_FILE)
+    players = load_players(data_dir / PLAYERS_FILE)
+    if relevance_model is None:
+        relevance_model = data_dir / MODELS_DIR / RELEVANCE_MODEL_FILE
+        use_relevance = use_relevance and relevance_model.exists()
+    if use_relevance:
+        texts = relevance_filter(texts, relevance_model, players, data_dir)
     if scorer == "clf" and model is None:
         model = data_dir / MODELS_DIR / MODEL_FILE
-    s = build_scorer(scorer, model, load_players(data_dir / PLAYERS_FILE))
+    s = build_scorer(scorer, model, players)
     parents = [""] * len(texts)
     if scorer == "clf" and s.model.config.features.parent:
         parents, missing = parent_texts_for(texts, data_dir)

@@ -65,6 +65,10 @@ class Masker:
         self._others = _alternation(self._owner)
         self._target_cache: dict[tuple, re.Pattern | None] = {}
 
+    def target_pattern(self, name: str, player_id: str = "", aliases: Iterable[str] = ()):
+        """Compiled pattern for the target's full name, aliases and surname(s), or None."""
+        return self._target_pattern(name, str(player_id), tuple(aliases))
+
     def _target_pattern(self, name: str, player_id: str, aliases: tuple[str, ...]):
         key = (name, player_id, aliases)
         if key not in self._target_cache:

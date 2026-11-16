@@ -56,6 +56,32 @@ words get vectors from their character n-grams, via our own reader of the `.bin`
 `fansent score` feeds `--parent` models the parent text of `reply_inherited` rows (see
 "Where the text data comes from"); explicit rows are non-replies, as in training.
 
+### Relevance filter
+
+A matched surname is often someone else: with a Cubs + Red Sox roster, "Martinez" or
+"Turner" in r/baseball usually means a player we do not track (~39% of Sonnet-labeled
+r/baseball matches are `na`, ~3% in the team subs). A second from-scratch classifier (same
+L2 logistic regression and L-BFGS) predicts whether a matched comment is about the matched
+player. Its features keep the name context that sentiment masking hides: match type (full
+name, alias, surname only), the words next to the mention, whether the preceding word is
+another first name or capitalized word, mention casing, own-team versus other-team terms
+(all 30 clubs, `classifier/teams.py`) in the comment and its parent, whether the parent
+names the player, and the subreddit (dense flags are duplicated for r/baseball so it learns
+its own rules), plus word TF-IDF. Labels: `na` vs pos/neu/neg from the labeled CSVs.
+
+```sh
+uv run fansent clf-eval  --task relevance --train a.csv b.csv --test test.csv  # holdout + test report
+uv run fansent clf-train --task relevance --train a.csv b.csv                  # -> <data-dir>/models/relevance.npz
+uv run fansent score --scorer clf          # uses relevance.npz automatically if present
+```
+
+The drop threshold is chosen on out-of-fold CV scores: `--operating-point precision`
+(default; lowest threshold with CV precision >= `--min-precision`, 0.8) or `f1`. `fansent score`
+drops rows with P(na) >= threshold before scoring, prints kept/dropped counts per subreddit,
+and writes `relevance.csv` (`text_id, player_id, p_relevant, kept`) for audits and sensitivity
+checks. `sentiment.csv` keeps its schema. `--relevance-model PATH` overrides the model,
+`--no-relevance` disables the filter. A stale `relevance.csv` from an earlier run is not removed.
+
 Labeled CSV schema (`text, player, player_id, final_label` or `draft_label`, optional
 `aliases` as `;`-separated nicknames; `na` rows are excluded from training and evaluation):
 

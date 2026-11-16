@@ -111,16 +111,18 @@ def format_report(results: dict[str, Metrics]) -> str:
     return "\n".join(lines)
 
 
-def grouped_folds(examples: list[Example], k: int, seed: int) -> list[np.ndarray]:
+def grouped_folds(
+    examples: list[Example], k: int, seed: int, strata=lambda e: e.label
+) -> list[np.ndarray]:
     """Folds that keep identical texts together (the same text can appear for several players,
-    and a split across train/test would leak), stratified by each group's first label."""
+    and a split across train/test would leak), stratified by ``strata`` of each group's first example (default: its label)."""
     rng = np.random.default_rng(seed)
     groups: dict[str, list[int]] = {}
     for i, e in enumerate(examples):
         groups.setdefault(e.text, []).append(i)
-    by_label: dict[str, list[list[int]]] = {}
+    by_label: dict = {}
     for g in groups.values():
-        by_label.setdefault(examples[g[0]].label, []).append(g)
+        by_label.setdefault(strata(examples[g[0]]), []).append(g)
     folds: list[list[int]] = [[] for _ in range(k)]
     j = 0
     for label in sorted(by_label):
