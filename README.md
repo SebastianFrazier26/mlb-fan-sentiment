@@ -8,6 +8,9 @@ week *t+1*, beyond what week *t* performance (and season-to-date form) already p
 Fanbases compared: r/CHICubs, r/redsox, r/baseball (neutral baseline), and `news` (GDELT
 headlines) — each judged only on the tracked players it talks about.
 
+**Results site:** <https://sebastianfrazier26.github.io/mlb-fan-sentiment/> (live once GitHub
+Pages is enabled; see [Results site](#results-site)).
+
 Fanbases compared: r/CHICubs, r/redsox, r/baseball (neutral baseline), and
 `news` (GDELT media tone) — each judged only on the tracked players it talks about.
 
@@ -144,6 +147,29 @@ q_bh, p_holm, n_units, n_obs, rhat_max`), `analysis_units.csv` (per-unit shrunk 
 `analysis_oaa.csv` / `analysis_oaa_units.csv`. `--method partial` runs the legacy per-pair
 partial correlation (OPS/ERA only, `analysis_players.csv`, `analysis_fanbases_partial.csv`) for
 comparison; it does not use the model, permutation test or corrections.
+
+## Results site
+
+A static page (forest plot of fanbase effects, permutation-null comparison, method, caveats)
+rendered from an aggregate-only snapshot, so it builds without `data/`:
+
+```sh
+uv run fansent snapshot data/runs/<run-id>   # analysis_fanbases.csv -> results/published/<run-id>.json
+uv run fansent site                          # newest snapshot -> site/index.html (+ data.json)
+python -m http.server -d site                # preview
+```
+
+The snapshot holds only per-(metric, fanbase) summary numbers from `analysis_fanbases.csv`;
+`fansent.site.validate_snapshot` rejects unknown keys, any string outside the metric/family
+vocabulary or a short identifier pattern, and non-finite numbers, so free text cannot be
+published. Per-player files (`analysis_units.csv`) are never read. Commit the snapshot to
+publish a new run; `.github/workflows/pages.yml` rebuilds and deploys on every push to `main`
+(and on manual dispatch). Charts are inline SVG generated in Python (no JavaScript), themed by
+`prefers-color-scheme`, and the page sets no frame restrictions so it can be embedded in an
+iframe.
+
+One-time setup (repo owner): Settings -> Pages -> Build and deployment -> Source: **GitHub
+Actions**. Until then the deploy job fails and the URL above returns 404.
 
 ## Notes & caveats
 

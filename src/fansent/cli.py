@@ -112,6 +112,27 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--correction", choices=["bh", "holm"], default="bh")
     p.add_argument("--alpha", type=float, default=0.05)
 
+    p = sub.add_parser(
+        "snapshot",
+        help="Write the aggregate-only public snapshot of a correlate run (results/published)",
+    )
+    p.add_argument("run_dir", help="Directory holding analysis_fanbases.csv")
+    p.add_argument("--run-id", help="Snapshot id (default: the run directory's name)")
+    p.add_argument("--season", type=int, default=2026)
+    p.add_argument("--perm-b", type=int, default=1000, help="--perm-b the run used")
+    p.add_argument(
+        "--status",
+        choices=["preliminary", "final"],
+        default="preliminary",
+        help="final drops the site's preliminary banner",
+    )
+    p.add_argument("--alpha", type=float, default=0.05)
+    p.add_argument("--out-dir", default="results/published")
+
+    p = sub.add_parser("site", help="Render the static results site from a published snapshot")
+    p.add_argument("--snapshot", help="Snapshot JSON (default: newest in results/published)")
+    p.add_argument("--out", default="site", help="Output directory (default: ./site)")
+
     args = parser.parse_args(argv)
     data_dir = resolve_data_dir(args.data_dir)
 
@@ -149,6 +170,28 @@ def main(argv: list[str] | None = None) -> None:
         from . import label
 
         label.run(args.file, args.port, args.open)
+    elif args.command == "snapshot":
+        from . import site
+
+        run_dir = Path(args.run_dir)
+        snap = site.snapshot_from_run(
+            run_dir,
+            args.run_id or run_dir.resolve().name,
+            args.season,
+            args.perm_b,
+            args.alpha,
+            args.status,
+        )
+        print(f"wrote {site.write_snapshot(snap, Path(args.out_dir))}")
+    elif args.command == "site":
+        from . import site
+
+        snap_path = (
+            Path(args.snapshot)
+            if args.snapshot
+            else site.latest_snapshot(site.DEFAULT_PUBLISHED_DIR)
+        )
+        print(f"wrote {site.build_site(snap_path, Path(args.out))} from {snap_path}")
     elif args.command == "correlate":
         if args.method == "partial":
             from . import analyze

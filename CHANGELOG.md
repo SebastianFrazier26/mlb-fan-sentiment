@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-10-22
+
+- Results site: snapshots carry a required `status` (`preliminary` | `final`, validated;
+  `fansent snapshot --status`, default `preliminary`). Preliminary snapshots render a
+  "Preliminary results" banner at the top of the page (run date, baseline sentiment scorer,
+  target-aware classifier not yet trained, numbers will change) and a "(preliminary)" title
+  suffix; `final` drops both. `2026-10-13-teams-clean` is marked preliminary.
+- Results site: `fansent snapshot RUN_DIR [--run-id ID] [--perm-b 1000]` writes an
+  aggregate-only, schema-validated `results/published/<run-id>.json` from a run's
+  `analysis_fanbases.csv`; `fansent site [--snapshot PATH] [--out site]` renders a static,
+  JavaScript-free page (headline tiles, forest plot with 95% credible intervals, permutation
+  p vs corrected q, data table, method, caveats) with light/dark themes and no frame
+  restrictions. First snapshot: `2026-10-13-teams-clean`. New `.github/workflows/pages.yml`
+  deploys it to GitHub Pages on push to `main` (needs Pages Source = GitHub Actions).
+  `site/` is gitignored build output.
+
 ## 2026-10-13
 
 - New `fansent label --file <csv> [--port 8765] [--open]`: a local labeling page (stdlib
