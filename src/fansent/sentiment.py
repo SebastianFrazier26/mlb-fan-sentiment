@@ -106,6 +106,19 @@ def relevance_filter(
     return [t for t, d in zip(texts, drop, strict=True) if not d]
 
 
+def _attach_fasttext(model, data_dir: Path) -> None:
+    """The model file only caches vectors for tokens seen in training; without the .bin every
+    other token silently gets no embedding, unlike at clf-eval time."""
+    from .classifier.embeddings import DEFAULT_BIN, EMBEDDINGS_DIR, FastTextVectors
+
+    bin_path = data_dir / EMBEDDINGS_DIR / DEFAULT_BIN
+    if not bin_path.exists():
+        print(f"warning: {bin_path} not found; unseen tokens get no embedding", file=sys.stderr)
+        return
+    model.vectorizer.vectors.provider = FastTextVectors(bin_path)
+    print(f"Using {bin_path.name} for tokens not cached in the model")
+
+
 def run(
     scorer: str = "vader",
     model: Path | None = None,
@@ -123,6 +136,8 @@ def run(
     if scorer == "clf" and model is None:
         model = data_dir / MODELS_DIR / MODEL_FILE
     s = build_scorer(scorer, model, players)
+    if scorer == "clf" and s.model.config.features.emb:
+        _attach_fasttext(s.model, data_dir)
     parents = [""] * len(texts)
     if scorer == "clf" and s.model.config.features.parent:
         parents, missing = parent_texts_for(texts, data_dir)

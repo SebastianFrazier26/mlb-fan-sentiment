@@ -2,6 +2,10 @@
 
 ## 2026-11-16
 
+- `fansent score --scorer clf` with an `--emb` model now loads
+  `<data-dir>/embeddings/crawl-300d-2M-subword.bin` for tokens not cached in the model file.
+  Before, those tokens silently got no embedding at scoring time (unlike `clf-eval`). Missing
+  `.bin`: stderr warning, cache-only vectors.
 - Relevance filter: `clf-train` / `clf-eval --task relevance` train a second classifier that
   predicts whether a matched comment is about the matched player (`na`: surname collision with
   a non-roster player, ordinary word, pun). `fansent score` loads
