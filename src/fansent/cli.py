@@ -189,6 +189,26 @@ def main(argv: list[str] | None = None) -> None:
         "week of the text date (player_teams.csv; abbreviations via teams.csv)",
     )
     p.add_argument(
+        "--exclude-teams",
+        nargs="+",
+        metavar="TEAM_ID|ABBR",
+        help="Inverse of --teams: drop sentiment rows whose player was on one of these teams "
+        "in the Mon-Sun week of the text date (needs player_teams.csv)",
+    )
+    p.add_argument(
+        "--pool-fanbases",
+        action="store_true",
+        help="Fit all included fanbases' units as one group (single mu, reported as 'pooled'). "
+        "Units stay (fanbase, player): a player in two fanbases is two units sharing outcomes",
+    )
+    p.add_argument(
+        "--alternative",
+        choices=["two-sided", "less", "greater"],
+        default="two-sided",
+        help="Which permutation p (perm_p / perm_p_less / perm_p_greater) feeds the q-values "
+        "and the * marker; all three are always written",
+    )
+    p.add_argument(
         "--pool-stats",
         choices=["league", "teams"],
         default="league",
@@ -209,6 +229,20 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--correction", choices=["bh", "holm"], default="bh")
     p.add_argument("--alpha", type=float, default=0.05)
+
+    p = sub.add_parser(
+        "confirm",
+        help="Run the pre-registered league-wide fielding confirmatory test "
+        "(spec: docs/preregistration.md)",
+        description="Run the confirmatory test exactly as pre-registered in "
+        "docs/preregistration.md: FLD_Z only, CHC/BOS player-weeks and news excluded, fanbases "
+        "pooled, 4 x 6000 iterations (burn 3000), B = 1000, one-sided permutation p, max R-hat "
+        "< 1.05. The specification is hard-coded and has no flags to change it; --workers and "
+        "--seed do not alter the estimand. Run once, after the data are final. Writes "
+        "confirm_result.json to the data directory.",
+    )
+    p.add_argument("--workers", type=int, default=1, help="Processes for the permutation null")
+    p.add_argument("--seed", type=int, default=0)
 
     p = sub.add_parser(
         "power",
@@ -389,6 +423,10 @@ def main(argv: list[str] | None = None) -> None:
             args.league_fanbases,
             Path(args.out_dir) if args.out_dir else None,
         )
+    elif args.command == "confirm":
+        from . import confirm
+
+        confirm.run(data_dir, workers=args.workers, seed=args.seed)
     elif args.command == "correlate":
         if args.method == "partial":
             from . import analyze
@@ -405,6 +443,9 @@ def main(argv: list[str] | None = None) -> None:
                 teams=correlate.resolve_teams(args.teams, data_dir / TEAMS_FILE)
                 if args.teams
                 else None,
+                exclude_teams=correlate.resolve_teams(args.exclude_teams, data_dir / TEAMS_FILE)
+                if args.exclude_teams
+                else frozenset(),
                 fanbases=frozenset(args.fanbases) if args.fanbases else None,
                 exclude_fanbases=frozenset(args.exclude_fanbases),
                 pool_stats=args.pool_stats,
@@ -426,6 +467,8 @@ def main(argv: list[str] | None = None) -> None:
                     perm_b=args.perm_b,
                     workers=args.workers,
                     seed=args.seed,
+                    pool_fanbases=args.pool_fanbases,
+                    alternative=args.alternative,
                 ),
                 args.metrics,
                 not args.no_composite,

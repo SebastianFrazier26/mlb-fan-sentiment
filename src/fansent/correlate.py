@@ -57,6 +57,8 @@ FANBASE_COLS = [
     "ci_high",
     "p_pos",
     "perm_p",
+    "perm_p_less",
+    "perm_p_greater",
     "q_bh",
     "p_holm",
     "n_units",
@@ -74,6 +76,8 @@ class Scope:
     """Restricts which sentiment rows are analysed (defaults = whole league, every fanbase).
 
     teams: keep rows whose (player, Monday-week of the text date) is on one of these team ids.
+    exclude_teams: drop those rows instead (the inverse); a player-week absent from
+    player_teams.csv is on no team and is kept.
     fanbases / exclude_fanbases: case-insensitive fanbase names, include-only / drop.
     pool_stats: COMPOSITE z-score pool; "teams" z-scores over only the players left after
     the teams and fanbase filters (before the own-team filter), "league" over every player."""
@@ -81,6 +85,7 @@ class Scope:
     teams: frozenset[int] | None = None
     fanbases: frozenset[str] | None = None
     exclude_fanbases: frozenset[str] = frozenset()
+    exclude_teams: frozenset[int] = frozenset()
     pool_stats: str = POOL_LEAGUE
 
 
@@ -119,18 +124,25 @@ def apply_scope(
             keep &= fb.isin({f.lower() for f in scope.fanbases})
         keep &= ~fb.isin({f.lower() for f in scope.exclude_fanbases})
         scores = scores[keep]
-    if scope.teams is not None:
+    if scope.teams is not None or scope.exclude_teams:
         if weekly_teams is None:
-            raise SystemExit("--teams needs player_teams.csv (run `fansent rosters`).")
+            raise SystemExit(
+                "--teams/--exclude-teams need player_teams.csv (run `fansent rosters`)."
+            )
         day = _day(scores["date"])
         week = (day - pd.to_timedelta(day.dt.weekday, unit="D")).dt.strftime("%Y-%m-%d")
-        on_team = {(p, w) for p, w, t in weekly_teams if t in scope.teams}
-        keep = [
-            (p, w) in on_team for p, w in zip(scores["player_id"].astype(str), week, strict=True)
-        ]
-        scores = scores[keep]
+        pairs = list(zip(scores["player_id"].astype(str), week, strict=True))
+        if scope.teams is not None:
+            on_team = {(p, w) for p, w, t in weekly_teams if t in scope.teams}
+            scores = scores[[pw in on_team for pw in pairs]]
+            pairs = [pw for pw in pairs if pw in on_team]
+        if scope.exclude_teams:
+            off = {(p, w) for p, w, t in weekly_teams if t in scope.exclude_teams}
+            scores = scores[[pw not in off for pw in pairs]]
     if scores.empty:
-        raise SystemExit("--teams/--fanbases/--exclude-fanbases left no sentiment rows.")
+        raise SystemExit(
+            "--teams/--exclude-teams/--fanbases/--exclude-fanbases left no sentiment rows."
+        )
     return scores
 
 
@@ -176,17 +188,24 @@ def family_of(metric: str) -> str:
     return FAMILY_METRICS
 
 
-def correct(df: pd.DataFrame) -> pd.DataFrame:
-    """Assign `family`/`exploratory` and add q_bh and p_holm within each family only.
+ALTERNATIVE_COLUMN = {
+    "two-sided": "perm_p",
+    "less": "perm_p_less",
+    "greater": "perm_p_greater",
+}
 
-    Exploratory rows keep raw perm_p and get NA corrections."""
+
+def correct(df: pd.DataFrame, alternative: str = "two-sided") -> pd.DataFrame:
+    """Assign `family`/`exploratory` and add q_bh and p_holm within each family only, from the
+    permutation p of the chosen alternative. Exploratory rows get NA corrections."""
+    pcol = ALTERNATIVE_COLUMN[alternative]
     out = df.copy()
     out["family"] = out["metric"].map(family_of)
     out["exploratory"] = out["family"] == FAMILY_EXPLORATORY
     out["q_bh"] = np.nan
     out["p_holm"] = np.nan
     for idx in out[~out["exploratory"]].groupby("family").groups.values():
-        p = out.loc[idx, "perm_p"].to_numpy()
+        p = out.loc[idx, pcol].to_numpy()
         out.loc[idx, "q_bh"] = benjamini_hochberg(p)
         out.loc[idx, "p_holm"] = holm(p)
     return out
@@ -230,7 +249,9 @@ def analyze(
         raise SystemExit(
             "No (metric, fanbase) had enough data; lower --min-weeks/--min-mentions or collect more."
         )
-    fb = correct(pd.concat([r.fanbases for r in results], ignore_index=True))[FANBASE_COLS]
+    fb = correct(pd.concat([r.fanbases for r in results], ignore_index=True), icfg.alternative)[
+        FANBASE_COLS
+    ]
     units = pd.concat([r.units for r in results], ignore_index=True)
     is_oaa = fb["metric"] == "OAA"
     return Outputs(
@@ -250,7 +271,7 @@ def format_table(fb: pd.DataFrame, correction: str, alpha: float) -> str:
     t["sig"] = (t[col] < alpha).map({True: "*", False: ""})
     for c in ("mu_mean", "ci_low", "ci_high"):
         t[c] = t[c].map("{:+.3f}".format)
-    for c in ("p_pos", "perm_p", "q_bh", "p_holm", "rhat_max"):
+    for c in ("p_pos", "perm_p", "perm_p_less", "perm_p_greater", "q_bh", "p_holm", "rhat_max"):
         t[c] = t[c].map("{:.3f}".format).replace("nan", "NA")
     blocks = []
     for fam in FAMILY_ORDER:
@@ -259,6 +280,26 @@ def format_table(fb: pd.DataFrame, correction: str, alpha: float) -> str:
             note = " (raw perm_p, not corrected)" if fam == FAMILY_EXPLORATORY else ""
             blocks.append(f"-- family: {fam}{note}\n{part.to_string(index=False)}")
     return "\n\n".join(blocks)
+
+
+def load_inputs(
+    data_dir: Path,
+) -> tuple[pd.DataFrame, pd.DataFrame, list[pd.DataFrame]]:
+    """(stats, sentiment scores, attribution sidecars that exist) from a data directory."""
+    stats = pd.read_csv(data_dir / STATS_FILE, dtype={"player_id": str})
+    sentiment_csv = data_dir / SENTIMENT_FILE
+    if not sentiment_csv.exists():
+        raise SystemExit(f"{sentiment_csv} not found — run `fansent score` first.")
+    scores = pd.read_csv(sentiment_csv, dtype={"text_id": str, "player_id": str})
+    sidecars = [
+        _read_optional(data_dir / REDDIT_ATTRIBUTION_FILE),
+        _read_optional(data_dir / NEWS_HEADLINES_FILE),
+    ]
+    return stats, scores, [s for s in sidecars if s is not None]
+
+
+def needs_weekly_teams(pcfg: PanelConfig, scope: Scope) -> bool:
+    return bool(pcfg.fanbase_teams) or scope.teams is not None or bool(scope.exclude_teams)
 
 
 def run(
@@ -272,25 +313,15 @@ def run(
     data_dir: Path = DEFAULT_DATA_DIR,
     scope: Scope = WHOLE_LEAGUE,
 ) -> None:
-    stats = pd.read_csv(data_dir / STATS_FILE, dtype={"player_id": str})
-    sentiment_csv = data_dir / SENTIMENT_FILE
-    if not sentiment_csv.exists():
-        raise SystemExit(f"{sentiment_csv} not found — run `fansent score` first.")
-    scores = pd.read_csv(sentiment_csv, dtype={"text_id": str, "player_id": str})
-    sidecars = [
-        _read_optional(data_dir / REDDIT_ATTRIBUTION_FILE),
-        _read_optional(data_dir / NEWS_HEADLINES_FILE),
-    ]
+    stats, scores, sidecars = load_inputs(data_dir)
     default_oaa = data_dir / OAA_FILE
     path = oaa_path or (default_oaa if default_oaa.exists() else None)
     oaa = pd.read_csv(path, dtype={"player_id": str}) if path else None
 
     out = analyze(
-        stats, scores, [s for s in sidecars if s is not None], oaa, pcfg, icfg, metrics,
+        stats, scores, sidecars, oaa, pcfg, icfg, metrics,
         include_composite, read_player_teams(data_dir / PLAYERS_FILE),
-        read_weekly_teams(data_dir / PLAYER_TEAMS_FILE)
-        if pcfg.fanbase_teams or scope.teams is not None
-        else None,
+        read_weekly_teams(data_dir / PLAYER_TEAMS_FILE) if needs_weekly_teams(pcfg, scope) else None,
         scope,
     )  # fmt: skip
     fanbases_out, units_out, oaa_out = (
@@ -307,7 +338,8 @@ def run(
     if out.dropped:
         print(f"own-team filter dropped text-player rows: {out.dropped}")
     print(
-        f"\n=== Fanbase effect mu_k: sentiment_t -> better performance t+1 ({correction} < {alpha}) ==="
+        f"\n=== Fanbase effect mu_k: sentiment_t -> better performance t+1 "
+        f"({correction} < {alpha}, {icfg.alternative} permutation p) ==="
     )
     print(format_table(pd.concat([out.fanbases, out.oaa_fanbases]), correction, alpha))
     for s in out.skipped:

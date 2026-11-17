@@ -16,7 +16,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from .composite import DEFAULT_COMPOSITE_WEIGHTS, composite_index
+from .composite import DEFAULT_COMPOSITE_WEIGHTS, FLD_Z, composite_index, fielding_index
 
 NEWS_SOURCE = "gdelt_headline"
 NEWS_FANBASE = "news"
@@ -276,7 +276,9 @@ def build_weekly_panel(
     metrics: list[str] | None = None,
     include_composite: bool = True,
 ) -> pd.DataFrame:
-    """Long panel over every metric present in `stats` (plus COMPOSITE) that has a threshold."""
+    """Long panel over every metric present in `stats` (plus COMPOSITE) that has a threshold.
+
+    FLD_Z is opt-in (only built when named in `metrics`) so plain runs keep their metric set."""
     st = load_stats(stats)
     elig = eligible_stats(st, cfg)
     parts = [elig]
@@ -284,6 +286,10 @@ def build_weekly_panel(
         comp = composite_index(elig, cfg.composite_weights, cfg.role_min_pa, st)
         if len(comp):
             parts.append(comp)
+    if metrics is not None and FLD_Z in metrics:
+        fld = fielding_index(elig)
+        if len(fld):
+            parts.append(fld)
     perf = pd.concat(parts, ignore_index=True)
     if metrics is not None:
         perf = perf[perf["metric"].isin(metrics)]

@@ -20,6 +20,8 @@ def _run_dir(tmp_path):
         ["exploratory", True, "CS_PCT", "redsox", 0.01, -0.3, 0.3, 0.5, 501 / 1001],
     ]
     df = pd.DataFrame(rows, columns=FANBASE_COLS[:9])
+    df["perm_p_less"] = df["perm_p"] / 2
+    df["perm_p_greater"] = 1 - df["perm_p"] / 2
     df["q_bh"] = [0.028, 0.633, 0.156, float("nan")]
     df["p_holm"] = [0.028, 0.633, 0.3, float("nan")]
     df["n_units"] = [23, 23, 13, 4]

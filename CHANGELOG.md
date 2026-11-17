@@ -2,6 +2,15 @@
 
 ## 2026-11-17
 
+- `fansent confirm`: runs the pre-registered league-wide fielding test with the specification
+  hard-coded (FLD_Z only; teams 111/112 and news excluded; pooled fanbases; 4 x 6000 / 3000
+  chains; B = 1000; one-sided p), prints CONFIRMED / NOT CONFIRMED with the pooled `mu`, 95% CrI
+  and p, enforces max R-hat < 1.05 (otherwise INVALID), and writes `confirm_result.json`. See
+  README "Confirmatory test".
+- `correlate`: new metric `FLD_Z` (chances-weighted mean of pooled z(FLD_PCT) and z(-ERRORS)
+  with week-t and season-to-date controls); `--exclude-teams`; `--pool-fanbases`;
+  `--alternative {two-sided,less,greater}`; `analysis_fanbases.csv` gains `perm_p_less` and
+  `perm_p_greater` after `perm_p`.
 - Pre-registered the confirmatory league-wide fielding test (`docs/preregistration.md`), written before any non-Cubs/Red Sox data was analyzed.
 - `fansent correlate`: `--chains/--iter/--burn` for the main fit (defaults raised to 4 x 6000,
   burn 3000, `InferenceConfig` too; max R-hat 1.015 on real data vs 1.084 at 2000 iterations),

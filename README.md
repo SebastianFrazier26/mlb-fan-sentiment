@@ -201,6 +201,28 @@ labeled 2026-04, so that month is longer than the rest. Monthly data gives ~5 po
   `Yankees`). Defaults are neutral, so news is included unless dropped:
   `fansent correlate --exclude-fanbases news` for Reddit only.
 
+- `--exclude-teams TEAM_ID|ABBR ...` is the inverse of `--teams`: drops rows where (player,
+  Monday-week of the text date) is on one of those teams; player-weeks missing from
+  `player_teams.csv` are kept. Needs `player_teams.csv`; composes with `--teams`.
+- `--pool-fanbases` fits every included unit as one group with a single `mu` (fanbase column
+  `pooled`). Units stay (fanbase, player), so a player discussed in two fanbases (own team sub
+  and r/baseball) is two units that share the same outcome series; the pooled interval treats
+  them as independent and is therefore somewhat too narrow. The permutation null is unaffected
+  (sentiment is shuffled within each unit, and under the null it carries no information).
+  Per-unit rows in `analysis_units.csv` keep their real fanbase.
+- `--alternative {two-sided,less,greater}` (default two-sided) picks which permutation p feeds
+  `q_bh`/`p_holm` and the `*` marker. Every row carries `perm_p` (two-sided), `perm_p_less =
+  (1 + #{null <= obs}) / (1 + B)` and `perm_p_greater` (mirror). `less` tests "more positive
+  sentiment, worse next outcome" (negative `mu`, in the better-performance orientation).
+- Metric `FLD_Z` (name it in `--metrics`; not built otherwise): fielding percentage and negated
+  errors are each z-scored pooled over their eligible player-weeks, then averaged weighted by
+  the week's chances (both components carry the same chances weight, so in practice an equal
+  mean), higher = better. `weight` = week chances. The week-*t* control is FLD_Z itself; the
+  season-to-date control z-scores `std_value` (computed from the cumulative `std_` counts, as for
+  every metric) per component against its own pooled distribution, as COMPOSITE does, because
+  cumulative errors live on a different scale than weekly ones. The z pools are league-wide
+  (every player in `stats.csv`). It sits in the `metrics` family.
+
 Thresholds below are unconfirmed assumptions rather than tuned values (composite weights, the
 reply weight and the correction families are user decisions of 2026-10-12): weekly minimum sample
 OPS/AVG 10 (PA/AB), ERA/WHIP 3 IP, FLD_PCT/ERRORS 3 chances, CS_PCT 2 attempts; >= 3 mentions
@@ -209,7 +231,7 @@ mentions weigh the same as explicit ones (`--reply-weight`, user decision 2026-1
 and a unit >= 3 consecutive-month pairs.
 
 Outputs: `analysis_fanbases.csv` (`family, exploratory, metric, fanbase, mu_mean, ci_low, ci_high, p_pos, perm_p,
-q_bh, p_holm, n_units, n_obs, rhat_max`), `analysis_units.csv` (per-unit shrunk effects),
+perm_p_less, perm_p_greater, q_bh, p_holm, n_units, n_obs, rhat_max`), `analysis_units.csv` (per-unit shrunk effects),
 `analysis_oaa.csv` / `analysis_oaa_units.csv`. `--method partial` runs the legacy per-pair
 partial correlation (OPS/ERA only, `analysis_players.csv`, `analysis_fanbases_partial.csv`) for
 comparison; it does not use the model, permutation test or corrections.
@@ -258,6 +280,29 @@ smaller ones; only the pooled league-wide estimate can exclude effects of a few 
 Rows near mu = 0 give the false-positive rate, nominal 0.05 (observed 0.03 to 0.07). Outputs:
 `power_curves.csv`, `power_mde.csv`. Simulated runtime: 264 s for the full default set at
 R = 150 on 6 workers (heavily loaded machine).
+
+## Confirmatory test
+
+The fielding result from the Cubs + Red Sox run was unplanned, so it is re-tested on the rest
+of the league under a specification written before any league data was analyzed:
+[`docs/preregistration.md`](docs/preregistration.md). `fansent confirm` runs exactly that
+specification and nothing else (no flags change it; `--workers` and `--seed` only affect
+speed and the random stream):
+
+```bash
+uv run fansent --data-dir <league data dir> confirm --workers 8
+```
+
+It runs `FLD_Z` only, drops every player-week on the Red Sox (111) or Cubs (112) per
+`player_teams.csv`, excludes `news`, applies the own-team rule, pools all fanbase units into one
+group, and uses 4 chains x 6,000 iterations (burn 3,000), B = 1,000 within-unit permutations and
+the one-sided permutation p (`perm_p_less`). **CONFIRMED** iff the pooled `mu` is negative and
+`perm_p_less < 0.05`; otherwise **NOT CONFIRMED**. The pooled `mu`, its 95% credible interval and
+the p-values are printed and written to `confirm_result.json` either way. If max R-hat is not
+below 1.05 the fit has not converged and the verdict is `INVALID (R-hat gate failed)`, flagged
+in the output and the JSON, instead of either outcome. Pooling treats a player who appears in
+two fanbases as two units (see `--pool-fanbases` above), so the interval is somewhat narrow;
+the registered decision uses the permutation p. Anything beyond this single test is exploratory.
 
 ## Results site
 
