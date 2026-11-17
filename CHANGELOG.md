@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-11-17
+
+- `fansent power`: Monte-Carlo power curves and minimum detectable effect (MDE, 80% power) of
+  the fanbase test, so a null can be stated as "no effect larger than X". Panels are simulated
+  from the hierarchical model's own structure at the real run's sizes (read from
+  `analysis_fanbases.csv` COMPOSITE rows), refit with the same sampler, and detection is the
+  95% CrI excluding 0. Scenarios: team sub, r/baseball, 30-fanbase league (per-fanbase), and
+  the pooled league-wide effect. `--perm-b` re-checks a few replicates with the permutation
+  test. Writes `power_curves.csv` / `power_mde.csv`. Results are in the README "Power" section.
+
 ## 2026-11-16
 
 - League-wide weekly rosters. `fansent rosters --season 2026` now pulls the dated 40-man roster
