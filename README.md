@@ -5,7 +5,7 @@ performance, and comparing fanbases on how "right" they are about their players.
 
 **Question:** does fan sentiment in week *t* predict a player's performance in
 week *t+1*, beyond what week *t* performance (and season-to-date form) already predicts?
-Fanbases compared: r/CHICubs, r/redsox, r/baseball (neutral baseline), and `news` (GDELT
+Fanbases compared: all 30 team subreddits, r/baseball (neutral baseline), and `news` (GDELT
 headlines) — each judged only on the tracked players it talks about.
 
 **Results site:** <https://sebastianfrazier26.github.io/mlb-fan-sentiment/> (live once GitHub
@@ -26,7 +26,7 @@ Docker alternative: `make docker-build`, then `make docker-run ARGS="rosters"`.
 ## Pipeline
 
 ```sh
-uv run fansent rosters --season 2026          # Cubs + Red Sox -> data/players.csv
+uv run fansent rosters --season 2026          # all 30 teams, weekly 40-man -> players.csv, player_teams.csv
 uv run fansent stats --season 2026            # weekly stats -> data/stats.csv
 # texts.csv (+ sidecars) come from the collectors (see below)
 uv run fansent score                          # VADER -> data/sentiment.csv
@@ -134,12 +134,15 @@ into `sentiment.csv` (VADER compound per text x player).
 
 Per metric (OPS, AVG, ERA, WHIP, FLD_PCT, ERRORS, CS_PCT, and a COMPOSITE index):
 
-1. **Panel.** Fanbase = subreddit for Reddit, `news` for `gdelt_headline`. A team subreddit
-   counts only mentions of its own team's players (user decision 2026-10-13): team membership
-   is `team_id` in `players.csv` (current roster, so a traded player leaves his old team's
-   subreddit), and the subreddit-to-team map is the bundled `src/fansent/team_subreddits.csv`
-   (all 30 teams; only CHICubs and redsox are `verified`, the other names are from memory and
-   marked `unverified`). `r/baseball`, `news`, and any subreddit not in the map are league-wide
+1. **Panel.** Fanbase = the subreddit's fanbase for Reddit (`src/fansent/team_subreddits.csv`:
+   `fanbase, subreddit, team_id, status`, all 30 teams verified 2026-11-16; Mets = NewYorkMets +
+   Mets and Athletics = OaklandAthletics + SacramentoAthletics each pool into one fanbase, the
+   A's are low-volume), `news` for `gdelt_headline`. A team fanbase counts only mentions of its
+   own team's players (user decision 2026-10-13), judged by week (2026-11-16): the player must
+   be on that team's 40-man in the Mon-Sun week of the text date (`player_teams.csv` from
+   `fansent rosters`), so traded players leave the old team's fanbase and count for the new one
+   from arrival. Without `player_teams.csv` it falls back, with a warning, to the single
+   `team_id` in `players.csv`. `r/baseball`, `news`, and any subreddit not in the map are league-wide
    (no filter); rows dropped per fanbase are printed. `--all-teams` (or
    `PanelConfig(fanbase_teams={})`) disables the filter for sensitivity checks. Per (fanbase,
    player, Mon-Sun week): weighted mean VADER compound and mention count. Each row at week *t*

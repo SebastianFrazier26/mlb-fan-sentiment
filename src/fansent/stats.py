@@ -9,19 +9,20 @@ go to a wide companion file. Rates are always recomputed from summed counts.
 from __future__ import annotations
 
 import datetime as dt
-import time
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-import requests
-
 from .util import (
     DEFAULT_DATA_DIR,
+    MLB_RAW_DIR,
+    PLAYER_TEAMS_FILE,
     PLAYERS_FILE,
     STATS_COUNTS_FILE,
     STATS_FILE,
+    TEAMS_FILE,
+    cached_get_json,
     ip_to_outs,
     read_csv,
     week_start,
@@ -141,16 +142,28 @@ METRICS = [
 ]
 
 
-def fetch_game_log(player_id: int, season: int, group: str) -> list[dict]:
-    resp = requests.get(
+def fetch_game_log(
+    player_id: int, season: int, group: str, cache_path: Path | None = None, pause: float = 0.0
+) -> list[dict]:
+    data = cached_get_json(
         f"{API}/people/{player_id}/stats",
-        params={"stats": "gameLog", "season": season, "group": group},
-        timeout=30,
+        {"stats": "gameLog", "season": season, "group": group},
+        cache_path,
+        pause,
     )
-    resp.raise_for_status()
-    for block in resp.json().get("stats", []):
+    for block in data.get("stats", []):
         return block.get("splits", [])
     return []
+
+
+def weekly_team_lookup(data_dir: Path) -> dict[tuple[str, str], str]:
+    """(player_id, week_start) -> team abbrev from player_teams.csv + teams.csv; {} if either is
+    absent, in which case every row carries the player's players.csv team."""
+    pt, teams = data_dir / PLAYER_TEAMS_FILE, data_dir / TEAMS_FILE
+    if not (pt.exists() and teams.exists()):
+        return {}
+    abbrev = {r["team_id"]: r["team"] for r in read_csv(teams)}
+    return {(r["player_id"], r["week_start"]): abbrev[r["team_id"]] for r in read_csv(pt)}
 
 
 def _int(st: dict, key: str) -> int:
@@ -244,30 +257,35 @@ def weekly_metrics(splits: list[dict], group: str) -> tuple[list[dict], list[dic
 def run(
     season: int,
     limit: int | None = None,
-    pause: float = 0.3,
+    pause: float = 0.15,
     data_dir: Path = DEFAULT_DATA_DIR,
+    refresh: bool = False,
 ) -> None:
+    """One row per player-week regardless of team. `team` is the team on that week's 40-man
+    (player_teams.csv) when known, else the player's last team from players.csv. Game logs are
+    cached under raw/mlb/gamelogs/<season>/ and reused unless refresh."""
     players = read_csv(data_dir / PLAYERS_FILE)
     if limit:
         players = players[:limit]
+    team_by_week = weekly_team_lookup(data_dir)
+    cache_dir = data_dir / MLB_RAW_DIR / "gamelogs" / str(season)
     rows, count_rows = [], []
     for i, p in enumerate(players, 1):
         pitcher = p["is_pitcher"] == "True"
-        ident = {
-            "player_id": p["player_id"],
-            "full_name": p["full_name"],
-            "team": p["team"],
-            "season": season,
-        }
+        ident = {"player_id": p["player_id"], "full_name": p["full_name"], "season": season}
         n_weeks = 0
         for group in ("pitching" if pitcher else "hitting", "fielding"):
-            splits = fetch_game_log(int(p["player_id"]), season, group)
+            cache = cache_dir / f"{p['player_id']}_{group}.json"
+            if refresh:
+                cache.unlink(missing_ok=True)
+            splits = fetch_game_log(int(p["player_id"]), season, group, cache, pause)
             long_rows, wide_rows = weekly_metrics(splits, group)
+            for r in long_rows + wide_rows:
+                r["team"] = team_by_week.get((p["player_id"], r["week_start"]), p["team"])
             rows += [{**ident, **r} for r in long_rows]
             count_rows += [{**ident, **r} for r in wide_rows]
             n_weeks += len(wide_rows)
-            time.sleep(pause)
-        print(f"[{i}/{len(players)}] {p['full_name']}: {n_weeks} group-weeks")
+        print(f"[{i}/{len(players)}] {p['full_name']}: {n_weeks} group-weeks", flush=True)
     stats_csv, counts_csv = data_dir / STATS_FILE, data_dir / STATS_COUNTS_FILE
     n = write_csv(stats_csv, rows, FIELDS)
     write_csv(counts_csv, count_rows, COUNTS_FIELDS)

@@ -4,6 +4,7 @@ multiple-comparison correction -> analysis_{fanbases,units,oaa}.csv."""
 from __future__ import annotations
 
 import time
+import warnings
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,6 +24,7 @@ from .panel import (
 from .util import (
     DEFAULT_DATA_DIR,
     OAA_FILE,
+    PLAYER_TEAMS_FILE,
     PLAYERS_FILE,
     REDDIT_ATTRIBUTION_FILE,
     SENTIMENT_FILE,
@@ -81,6 +83,20 @@ def read_player_teams(path: Path) -> dict[str, int]:
     return dict(zip(df["player_id"], df["team_id"].astype(int), strict=True))
 
 
+def read_weekly_teams(path: Path) -> frozenset[tuple[str, str, int]] | None:
+    """player_teams.csv -> {(player_id, week_start, team_id)}; None (with a warning) if absent,
+    so the filter falls back to the single team in players.csv."""
+    if not path.exists():
+        warnings.warn(
+            f"{path} not found: own-team filter falls back to players.csv team_id "
+            "(a traded player is attributed to his last team for the whole season)",
+            stacklevel=2,
+        )
+        return None
+    df = pd.read_csv(path, dtype={"player_id": str, "week_start": str})
+    return frozenset(zip(df["player_id"], df["week_start"], df["team_id"].astype(int), strict=True))
+
+
 def family_of(metric: str) -> str:
     if metric in EXPLORATORY_METRICS:
         return FAMILY_EXPLORATORY
@@ -115,9 +131,10 @@ def analyze(
     metrics: list[str] | None = None,
     include_composite: bool = True,
     player_teams: Mapping[str, int] | None = None,
+    weekly_teams: frozenset[tuple[str, str, int]] | None = None,
 ) -> Outputs:
     t0 = time.perf_counter()
-    scores, dropped = filter_own_team(scores, pcfg, player_teams)
+    scores, dropped = filter_own_team(scores, pcfg, player_teams, weekly_teams)
     weekly_sent, monthly_sent = sentiment_periods(scores, sidecars, pcfg)
     panel = build_weekly_panel(stats, weekly_sent, pcfg, metrics, include_composite)
     results: list[MetricResult] = []
@@ -195,6 +212,7 @@ def run(
     out = analyze(
         stats, scores, [s for s in sidecars if s is not None], oaa, pcfg, icfg, metrics,
         include_composite, read_player_teams(data_dir / PLAYERS_FILE),
+        read_weekly_teams(data_dir / PLAYER_TEAMS_FILE) if pcfg.fanbase_teams else None,
     )  # fmt: skip
     fanbases_out, units_out, oaa_out = (
         data_dir / FANBASES_OUT,

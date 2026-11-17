@@ -8,6 +8,7 @@ from fansent.panel import (
     build_weekly_panel,
     fanbase_of,
     filter_own_team,
+    load_fanbase_teams,
     load_team_subreddits,
     oriented,
     sentiment_periods,
@@ -273,7 +274,7 @@ def test_all_teams_restores_everything():
 def test_subreddit_match_is_case_insensitive():
     rows = scores([("a", "reddit_arctic", "chicubs", "2026-04-06", "2", 0.2)])
     kept, dropped = filter_own_team(rows, PanelConfig(), TEAMS)
-    assert kept.empty and dropped == {"chicubs": 1}
+    assert kept.empty and dropped == {"CHICubs": 1}
 
 
 def test_filter_without_roster_is_an_error_not_a_silent_pass():
@@ -283,5 +284,7 @@ def test_filter_without_roster_is_an_error_not_a_silent_pass():
 
 def test_bundled_map_has_both_demo_teams_and_unique_ids():
     m = load_team_subreddits()
-    assert m["chicubs"] == frozenset({112}) and m["redsox"] == frozenset({111})
-    assert len(m) == 30 and len({next(iter(v)) for v in m.values()}) == 30
+    teams = load_fanbase_teams()
+    assert teams["chicubs"] == frozenset({112}) and teams["redsox"] == frozenset({111})
+    assert m["chicubs"] == "CHICubs"
+    assert len(teams) == 30 and len({next(iter(v)) for v in teams.values()}) == 30

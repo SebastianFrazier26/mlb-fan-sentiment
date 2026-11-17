@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 from pathlib import Path
 
 from .util import (
@@ -28,15 +29,23 @@ def main(argv: list[str] | None = None) -> None:
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p = sub.add_parser("rosters", help="Fetch Cubs + Red Sox rosters into players.csv")
+    p = sub.add_parser(
+        "rosters",
+        help="Fetch weekly 40-man rosters for all 30 teams -> players.csv, player_teams.csv",
+    )
     p.add_argument("--season", type=int, default=2026)
     p.add_argument(
-        "--roster-type", default="fullSeason", help="MLB API rosterType (fullSeason, active, 40Man)"
+        "--teams", nargs="+", metavar="TEAM", help="Restrict to these abbrevs/ids (e.g. CHC 111)"
     )
+    p.add_argument("--first-week", type=dt.date.fromisoformat, help="Monday; needed off 2026")
+    p.add_argument("--last-week", type=dt.date.fromisoformat, help="Monday; needed off 2026")
 
     p = sub.add_parser("stats", help="Pull game logs, aggregate to weekly stats.csv")
     p.add_argument("--season", type=int, default=2026)
     p.add_argument("--limit", type=int, help="Only first N players (smoke testing)")
+    p.add_argument(
+        "--refresh", action="store_true", help="Ignore cached raw/mlb/gamelogs and refetch"
+    )
 
     p = sub.add_parser(
         "oaa", help="Load a Baseball Savant monthly OAA CSV export into oaa_monthly.csv"
@@ -196,11 +205,11 @@ def main(argv: list[str] | None = None) -> None:
     if args.command == "rosters":
         from . import rosters
 
-        rosters.run(args.season, args.roster_type, data_dir)
+        rosters.run(args.season, data_dir, args.teams, args.first_week, args.last_week)
     elif args.command == "stats":
         from . import stats
 
-        stats.run(args.season, args.limit, data_dir=data_dir)
+        stats.run(args.season, args.limit, data_dir=data_dir, refresh=args.refresh)
     elif args.command == "oaa":
         from . import oaa
 
