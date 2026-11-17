@@ -99,7 +99,6 @@ class PanelConfig:
     # OAA monthly panel
     min_month_mentions: int = 10
     min_months: int = 3
-    min_oaa_attempts: float = 10.0
 
 
 def _day(s: pd.Series) -> pd.Series:
@@ -307,13 +306,17 @@ def build_weekly_panel(
 def build_oaa_panel(
     oaa: pd.DataFrame, monthly_sent: pd.DataFrame, cfg: PanelConfig
 ) -> pd.DataFrame:
-    """Monthly sentiment vs next-month OAA; `std` is season-to-date cumulative OAA."""
+    """Monthly sentiment vs next-month OAA; `std` is season-to-date cumulative OAA.
+
+    Savant exports no attempts count, so the panel is unweighted (weight NaN). Monthly OAA values
+    are independent, so the cumulative control is their running sum within the season."""
     df = oaa.copy()
     df["player_id"] = df["player_id"].astype(str)
     df["period"] = pd.to_datetime(df["month"])
-    df = df[df["attempts"] >= cfg.min_oaa_attempts].sort_values(["player_id", "period"])
+    df = df.dropna(subset=["oaa"]).sort_values(["player_id", "period"])
     df["std_value"] = df.groupby(["player_id", df["period"].dt.year])["oaa"].cumsum()
-    df = df.rename(columns={"oaa": "value", "attempts": "weight"})
+    df = df.rename(columns={"oaa": "value"})
+    df["weight"] = np.nan
     df["metric"] = "OAA"
     df["higher_is_better"] = True
     df = df[
