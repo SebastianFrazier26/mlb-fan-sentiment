@@ -179,6 +179,25 @@ Per metric (OPS, AVG, ERA, WHIP, FLD_PCT, ERRORS, CS_PCT, and a COMPOSITE index)
    permutation, weighted by next-month attempts. Monthly data gives ~5 points per unit, too few
    for per-unit partial correlations, so the hierarchical pooling is used instead.
 
+**Fit settings and scope flags (2026-11-17).**
+
+- `--chains/--iter/--burn` configure the main fit (defaults 4 x 6000, burn 3000; on real data
+  this gave max R-hat 1.015 where 2000 iterations gave 1.084). The permutation fits keep their
+  own light settings, `--perm-iter/--perm-burn` (defaults 600/300).
+- `--teams TEAM_ID|ABBR ...` keeps only sentiment rows where (player, Monday-week of the text
+  date) is in `player_teams.csv` with one of these team ids; abbreviations resolve through
+  `teams.csv`. It needs `player_teams.csv`. It applies before and independently of the own-team
+  filter.
+- `--pool-stats {league,teams}` (default `league`) sets who the COMPOSITE z-scores are pooled
+  over. `league`: every player in `stats.csv`, so composite values are comparable across runs.
+  `teams`: only the players still present after `--teams/--fanbases/--exclude-fanbases`, so
+  "good" means good relative to that group, and composites are not comparable with league runs.
+  Only the COMPOSITE changes; single metrics are never pooled.
+- `--fanbases NAME ...` (include only) and `--exclude-fanbases NAME ...` (drop), matched
+  case-insensitively against fanbase names (`news`, `baseball`, a team fanbase such as
+  `Yankees`). Defaults are neutral, so news is included unless dropped:
+  `fansent correlate --exclude-fanbases news` for Reddit only.
+
 Thresholds below are unconfirmed assumptions rather than tuned values (composite weights, the
 reply weight and the correction families are user decisions of 2026-10-12): weekly minimum sample
 OPS/AVG 10 (PA/AB), ERA/WHIP 3 IP, FLD_PCT/ERRORS 3 chances, CS_PCT 2 attempts; >= 3 mentions

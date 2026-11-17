@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-11-17
+
+- `fansent correlate`: `--chains/--iter/--burn` for the main fit (defaults raised to 4 x 6000,
+  burn 3000, `InferenceConfig` too; max R-hat 1.015 on real data vs 1.084 at 2000 iterations),
+  `--perm-iter/--perm-burn` for the permutation fits (defaults unchanged).
+- `--teams TEAM_ID|ABBR ...` restricts to rows where the player was on one of those teams in the
+  week of the text date; `--pool-stats {league,teams}` chooses the COMPOSITE z-score pool
+  (default league); `--fanbases` / `--exclude-fanbases` include-only / drop fanbases (defaults
+  neutral: pass `--exclude-fanbases news` for Reddit only). See README Method.
+
 ## 2026-11-16
 
 - League-wide weekly rosters. `fansent rosters --season 2026` now pulls the dated 40-man roster
