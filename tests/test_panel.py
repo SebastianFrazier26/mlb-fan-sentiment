@@ -194,33 +194,60 @@ def test_composite_needs_anchor_and_role():
     assert composite_index(only, weights, 20.0, st).empty
 
 
-def test_oaa_panel_consecutive_months_and_cumulative_std():
+def _oaa_sent(months, n=20):
+    return pd.DataFrame(
+        {
+            "fanbase": "redsox",
+            "player_id": "1",
+            "period": pd.to_datetime(months),
+            "sent": 0.1,
+            "n_mentions": n,
+        }
+    )
+
+
+def test_oaa_panel_no_attempts_column_consecutive_pairs_and_cumulative_std():
     from fansent.panel import build_oaa_panel
 
+    months = ["2026-04-01", "2026-05-01", "2026-06-01", "2026-08-01", "2026-09-01"]
     oaa = pd.DataFrame(
         {
             "player_id": ["1"] * 5,
             "full_name": "P",
-            "month": ["2026-04-01", "2026-05-01", "2026-06-01", "2026-08-01", "2026-09-01"],
+            "month": months,
             "oaa": [2.0, -1.0, 3.0, 1.0, 4.0],
-            "attempts": [40, 35, 5, 30, 30],  # June below the 10-attempt floor
-        }
-    )
-    sent = pd.DataFrame(
-        {
-            "fanbase": "redsox",
-            "player_id": "1",
-            "period": pd.to_datetime(oaa["month"]),
-            "sent": 0.1,
-            "n_mentions": 20,
         }
     )
     cfg = PanelConfig(min_months=1, min_units_per_fanbase=1)
-    p = build_oaa_panel(oaa, sent, cfg)
-    got = p.sort_values("period")[["period", "perf", "y_next", "std"]]
-    assert got["period"].dt.strftime("%m").tolist() == ["04", "08"]
-    assert got["perf"].tolist() == [2.0, 1.0] and got["y_next"].tolist() == [-1.0, 4.0]
-    assert got["std"].tolist() == [2.0, 1.0 + 2.0 - 1.0]  # cumulative over eligible months
+    p = build_oaa_panel(oaa, _oaa_sent(months), cfg).sort_values("period")
+    assert p["period"].dt.strftime("%m").tolist() == [
+        "04",
+        "05",
+        "08",
+    ]  # no 07 -> Jun, Sep unpaired
+    assert p["perf"].tolist() == [2.0, -1.0, 1.0]
+    assert p["y_next"].tolist() == [-1.0, 3.0, 4.0]
+    assert p["std"].tolist() == [2.0, 1.0, 5.0]  # sum of independent monthly values, incl. gaps
+    assert p["weight"].isna().all()
+
+
+def test_oaa_panel_ignores_attempts_column_and_needs_three_pairs():
+    from fansent.panel import build_oaa_panel
+
+    months = ["2026-04-01", "2026-05-01", "2026-06-01", "2026-07-01"]
+    oaa = pd.DataFrame(
+        {
+            "player_id": "1",
+            "full_name": "P",
+            "month": months,
+            "oaa": [1.0, 2.0, 3.0, 4.0],
+            "attempts": [1, 1, 1, 1],
+        }
+    )
+    cfg = PanelConfig(min_units_per_fanbase=1)
+    assert len(build_oaa_panel(oaa, _oaa_sent(months), cfg)) == 3
+    assert len(build_oaa_panel(oaa.iloc[:3], _oaa_sent(months[:3]), cfg)) == 0  # only 2 pairs
+    assert len(build_oaa_panel(oaa, _oaa_sent(months, n=9), cfg)) == 0  # below mention floor
 
 
 def test_default_composite_weights():

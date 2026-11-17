@@ -176,7 +176,10 @@ Per metric (OPS, AVG, ERA, WHIP, FLD_PCT, ERRORS, CS_PCT, and a COMPOSITE index)
    sample-size weight.
 6. **OAA check.** Monthly mean sentiment vs next-month Outs Above Average (consecutive months),
    controlling current-month OAA and cumulative season OAA, through the same model and
-   permutation, weighted by next-month attempts. Monthly data gives ~5 points per unit, too few
+   permutation, unweighted (the Savant export has no attempts column). A unit needs >= 3
+consecutive-month pairs (month m with OAA and sentiment, month m+1 with OAA); the cumulative
+control is the sum of the independent monthly values up to m. March and April are one bucket
+labeled 2026-04, so that month is longer than the rest. Monthly data gives ~5 points per unit, too few
    for per-unit partial correlations, so the hierarchical pooling is used instead.
 
 **Fit settings and scope flags (2026-11-17).**
@@ -202,14 +205,59 @@ Thresholds below are unconfirmed assumptions rather than tuned values (composite
 reply weight and the correction families are user decisions of 2026-10-12): weekly minimum sample
 OPS/AVG 10 (PA/AB), ERA/WHIP 3 IP, FLD_PCT/ERRORS 3 chances, CS_PCT 2 attempts; >= 3 mentions
 per player-week; >= 8 weeks per unit; >= 3 units per (metric, fanbase); `reply_inherited`
-mentions weigh the same as explicit ones (`--reply-weight`, user decision 2026-10-12); OAA months need >= 10 mentions,
->= 10 attempts, >= 3 months per unit.
+mentions weigh the same as explicit ones (`--reply-weight`, user decision 2026-10-12); OAA months need >= 10 mentions
+and a unit >= 3 consecutive-month pairs.
 
 Outputs: `analysis_fanbases.csv` (`family, exploratory, metric, fanbase, mu_mean, ci_low, ci_high, p_pos, perm_p,
 q_bh, p_holm, n_units, n_obs, rhat_max`), `analysis_units.csv` (per-unit shrunk effects),
 `analysis_oaa.csv` / `analysis_oaa_units.csv`. `--method partial` runs the legacy per-pair
 partial correlation (OPS/ERA only, `analysis_players.csv`, `analysis_fanbases_partial.csv`) for
 comparison; it does not use the model, permutation test or corrections.
+
+## Power
+
+`fansent power` answers "if there were an effect, would this design have found it?", so a null
+can be stated as "no effect larger than X". It simulates panels from the hierarchical model's own
+structure (per-unit intercepts, perf/std controls, `gamma_unit ~ N(mu, tau^2)`) at the sizes of
+the real run (units and obs per unit are read from the COMPOSITE rows of `analysis_fanbases.csv`;
+defaults if absent), refits each with the same Gibbs sampler (light settings: 2 chains, 600
+iterations), and counts a detection when the 95% CrI of `mu` excludes 0. Seeded, independent of
+`--workers`. Noise (`--sigma 1.0`) and between-player spread (`--tau 0.1`) are assumptions, not
+read from a run; they reproduce the real run's CrI widths (simulated 0.26 for a team sub, 0.17
+for r/baseball; real Cubs 0.26, r/baseball 0.19).
+
+The CrI rule is a proxy. The shipped test is a permutation p-value with BH correction within
+family, so CrI power is an upper bound on the shipped test's power and the MDE a lower bound.
+Checked at team-sub size (`--perm-b 99`, 40 replicates per point, uncorrected permutation
+p < 0.05): power 0.07 / 0.38 / 0.90 / 1.00 at mu = 0 / 0.1 / 0.2 / 0.3, the same as the CrI
+within Monte-Carlo noise, so the loss comes from the multiplicity correction, not the permutation.
+
+Power at R = 150 datasets per point (mu in sd of next-week performance per sd of sentiment).
+`team` = 23 units x 15.9 weeks; `r/baseball` = 47 x 16.2; `league` = 30 fanbases x 25 units
+(per-fanbase power, 4500 tests per point); `pooled` = those 750 units fit as one fanbase, i.e.
+the average effect across 30 teams, assuming they share one mu.
+
+| mu | team sub | r/baseball | league, per fanbase |
+|---|---|---|---|
+| 0 | 0.05 | 0.07 | 0.03 |
+| 0.05 | 0.10 | 0.25 | 0.11 |
+| 0.10 | 0.33 | 0.75 | 0.37 |
+| 0.15 | 0.63 | 0.98 | 0.70 |
+| 0.20 | 0.79 | 1.00 | 0.92 |
+| 0.30 | 1.00 | 1.00 | 1.00 |
+
+| pooled mu | 0 | 0.01 | 0.02 | 0.03 | 0.05 |
+|---|---|---|---|---|---|
+| power | 0.07 | 0.17 | 0.47 | 0.88 | 1.00 |
+
+Minimum detectable effect at 80% power: team sub 0.20, r/baseball 0.11, league per fanbase
+0.17, pooled league-wide 0.028. With `--tau 0.2` the team-sub and r/baseball MDEs rise to 0.24
+and 0.13. Pitching-metric subsets (8-13 units, ~13 obs each; `--scenarios pitching`) are weaker
+still. Rough reading: a single team's null rules out effects above about 0.2 sd per sd, not
+smaller ones; only the pooled league-wide estimate can exclude effects of a few hundredths.
+Rows near mu = 0 give the false-positive rate, nominal 0.05 (observed 0.03 to 0.07). Outputs:
+`power_curves.csv`, `power_mde.csv`. Simulated runtime: 264 s for the full default set at
+R = 150 on 6 workers (heavily loaded machine).
 
 ## Results site
 
@@ -272,7 +320,8 @@ group are 0. For pitchers `h`/`bb` are hits/walks allowed and `outs` = innings x
 `data/oaa_monthly.csv` — from `uv run fansent oaa PATH` (reads a Baseball Savant Outs Above
 Average CSV export with monthly splits; the download itself lives in the private
 collector): `player_id, full_name, month (first of month), oaa, attempts,
-fielding_runs_prevented`. Rows for several positions in a month are summed.
+fielding_runs_prevented`. Rows for several positions in a month are summed. `attempts` is empty
+for real Savant exports (no such column) and is not used.
 
 ## License
 

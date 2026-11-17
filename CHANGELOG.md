@@ -10,6 +10,20 @@
   (default league); `--fanbases` / `--exclude-fanbases` include-only / drop fanbases (defaults
   neutral: pass `--exclude-fanbases news` for Reddit only). See README Method.
 
+- `fansent power`: Monte-Carlo power curves and minimum detectable effect (MDE, 80% power) of
+  the fanbase test, so a null can be stated as "no effect larger than X". Panels are simulated
+  from the hierarchical model's own structure at the real run's sizes (read from
+  `analysis_fanbases.csv` COMPOSITE rows), refit with the same sampler, and detection is the
+  95% CrI excluding 0. Scenarios: team sub, r/baseball, 30-fanbase league (per-fanbase), and
+  the pooled league-wide effect. `--perm-b` re-checks a few replicates with the permutation
+  test. Writes `power_curves.csv` / `power_mde.csv`. Results are in the README "Power" section.
+
+- OAA check fixed for the real Savant export, which has monthly independent OAA and no attempts
+  column (Mar+Apr arrive as one bucket labeled 2026-04). The OAA family is now unweighted and the
+  10-attempt floor (`min_oaa_attempts`) is removed. A unit needs >= 3 consecutive-month pairs and
+  months need >= 10 mentions (`min_month_mentions`); cumulative season OAA is the running sum of
+  monthly values. `fansent oaa` still reads an `attempts` column if present.
+
 ## 2026-11-16
 
 - League-wide weekly rosters. `fansent rosters --season 2026` now pulls the dated 40-man roster

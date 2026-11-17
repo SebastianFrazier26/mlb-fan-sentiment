@@ -211,6 +211,30 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--alpha", type=float, default=0.05)
 
     p = sub.add_parser(
+        "power",
+        help="Simulated power / minimum detectable effect of the fanbase test",
+    )
+    p.add_argument("--reps", type=int, default=100, help="Simulated datasets per grid point")
+    p.add_argument("--workers", type=int, default=1)
+    p.add_argument("--seed", type=int, default=0)
+    p.add_argument(
+        "--scenarios",
+        nargs="+",
+        default=["team", "baseball", "league", "pooled"],
+        help="team, baseball, league, pooled, pitching",
+    )
+    p.add_argument("--mus", nargs="+", type=float, help="True fanbase effects (sd per sd)")
+    p.add_argument("--pooled-mus", nargs="+", type=float, help="Grid for the pooled scenario")
+    p.add_argument("--league-units", type=int, default=25, help="Units per fanbase, league")
+    p.add_argument("--league-fanbases", type=int, default=30)
+    p.add_argument("--tau", type=float, default=0.1, help="Between-player slope sd")
+    p.add_argument("--sigma", type=float, default=1.0, help="Residual noise sd (signal sd ~0.3)")
+    p.add_argument("--perm-b", type=int, default=0, help="Confirm with permutation test at B")
+    p.add_argument("--perm-reps", type=int, default=10, help="Replicates per point to confirm")
+    p.add_argument("--target", type=float, default=0.8)
+    p.add_argument("--out-dir", help="Where to write power_*.csv (default: data dir)")
+
+    p = sub.add_parser(
         "snapshot",
         help="Write the aggregate-only public snapshot of a correlate run (results/published)",
     )
@@ -344,6 +368,27 @@ def main(argv: list[str] | None = None) -> None:
             else site.latest_snapshot(site.DEFAULT_PUBLISHED_DIR)
         )
         print(f"wrote {site.build_site(snap_path, Path(args.out))} from {snap_path}")
+    elif args.command == "power":
+        from . import power
+
+        power.run(
+            data_dir,
+            power.PowerConfig(
+                reps=args.reps,
+                seed=args.seed,
+                workers=args.workers,
+                dgp=power.Dgp(tau=args.tau, sigma=args.sigma),
+                perm_b=args.perm_b,
+                perm_reps=args.perm_reps,
+                target=args.target,
+            ),
+            args.scenarios,
+            tuple(args.mus or power.DEFAULT_MUS),
+            tuple(args.pooled_mus or power.DEFAULT_POOLED_MUS),
+            args.league_units,
+            args.league_fanbases,
+            Path(args.out_dir) if args.out_dir else None,
+        )
     elif args.command == "correlate":
         if args.method == "partial":
             from . import analyze
