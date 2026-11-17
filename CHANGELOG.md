@@ -2,6 +2,26 @@
 
 ## 2026-11-16
 
+- League-wide weekly rosters. `fansent rosters --season 2026` now pulls the dated 40-man roster
+  of all 30 teams for every Mon-Sun week of the season (snapshot taken on the Thursday of the
+  week, so a mid-week trade lands about evenly on either side; responses cached under
+  `<data-dir>/raw/mlb/rosters/`). New outputs: `player_teams.csv` (`player_id, team_id,
+  week_start`, one row per player-week) and `teams.csv`. `players.csv` is one row per player
+  with the team at the last week seen and gains `first_name` and `suffix`; `last_name` now comes
+  from the API's `lastName` (suffix excluded: "Acuña", suffix "Jr."), fixing `Jr.`/`III` surnames
+  that used to break name matching. `team` is now the abbreviation. `--roster-type` is removed
+  (always 40-man by date); `--teams` restricts, `--first-week/--last-week` for other seasons.
+- `team_subreddits.csv` schema is now `fanbase, subreddit, team_id, status`. Several subreddits
+  may share one fanbase (Mets = NewYorkMets + Mets; Athletics = OaklandAthletics +
+  SacramentoAthletics, low volume), mapped case-insensitively in the panel. All 30 verified;
+  corrected names: miamimarlins (not letsgofish), TexasRangers (not r/Rangers).
+- Own-team filter is by week: a team-subreddit mention counts only if the player was on that
+  fanbase's team in the Mon-Sun week of the text date (`player_teams.csv`). Absent file: falls
+  back to `players.csv` `team_id` with a warning. Dropped counts per fanbase are printed.
+- `fansent stats` runs for the league list; game logs are cached under
+  `<data-dir>/raw/mlb/gamelogs/<season>/` (`--refresh` to refetch) and the `team` column is the
+  team on that week's roster when known. `load_team_subreddits()` now returns subreddit ->
+  fanbase; `load_fanbase_teams()` gives fanbase -> team ids.
 - `fansent score --scorer clf` with an `--emb` model now loads
   `<data-dir>/embeddings/crawl-300d-2M-subword.bin` for tokens not cached in the model file.
   Before, those tokens silently got no embedding at scoring time (unlike `clf-eval`). Missing

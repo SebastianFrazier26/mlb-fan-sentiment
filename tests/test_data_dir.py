@@ -61,19 +61,15 @@ def test_default_dir_is_cwd_data(tmp_path, monkeypatch):
 
 
 def test_rosters_writes_into_dir_with_mocked_network(tmp_path, monkeypatch):
-    row = {
-        "player_id": "1",
-        "full_name": "A B",
-        "last_name": "B",
-        "team": "Cubs",
-        "team_id": 112,
-        "subreddit": "CHICubs",
-        "position": "P",
-        "is_pitcher": True,
-    }
-    monkeypatch.setattr(rosters, "fetch_rosters", lambda season, roster_type: [row])
-    cli.main(["--data-dir", str(tmp_path), "rosters", "--season", "2026"])
-    assert "A B" in (tmp_path / "players.csv").read_text()
+    from test_rosters import fake_api
+
+    monkeypatch.setattr(rosters, "cached_get_json", fake_api)
+    cli.main(
+        ["--data-dir", str(tmp_path), "rosters", "--season", "2026", "--first-week", "2026-04-06"]
+        + ["--last-week", "2026-04-20"]
+    )
+    assert "Acuña" in (tmp_path / "players.csv").read_text()
+    assert (tmp_path / "player_teams.csv").exists()
 
 
 def test_score_reads_and_writes_in_dir(tmp_path):

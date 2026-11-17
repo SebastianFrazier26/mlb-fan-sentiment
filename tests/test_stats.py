@@ -147,7 +147,7 @@ def test_run_with_mocked_http(tmp_path, monkeypatch):
         "pitching": [_pit("2026-04-07", "6.0", er=2, h=4, bb=1)],
         "fielding": [_fld("2026-04-06", 1, chances=2, putOuts=2)],
     }
-    monkeypatch.setattr(stats, "fetch_game_log", lambda pid, season, group: logs[group])
+    monkeypatch.setattr(stats, "fetch_game_log", lambda pid, season, group, *a: logs[group])
     stats.run(2026, pause=0, data_dir=tmp_path)
     text = (tmp_path / "stats.csv").read_text()
     for metric in ("OPS", "AVG", "ERA", "WHIP", "FLD_PCT", "ERRORS"):

@@ -25,6 +25,9 @@
 - 2026-10-13T00:00Z [USER] A team subreddit fanbase counts ONLY its own team's players (r/CHICubs -> Cubs 112, r/redsox -> Red Sox 111; roster `team_id` from players.csv, so traded players leave the old team's sub). r/baseball and news stay league-wide. `--all-teams` disables for sensitivity checks.
 - 2026-10-13T00:00Z [CODE] Unmapped subreddits are treated as league-wide (not an error) so new/non-team sources work; 28 non-demo entries in team_subreddits.csv are unverified recall.
 
+- 2026-11-16T00:00Z [USER] Expand to all 30 MLB teams. Track player->team BY WEEK from dated 40-man rosters (`player_teams.csv`); own-team filter uses the team in the week of the mention (supersedes the 2026-10-13 players.csv current-roster rule, which stays as the warned fallback). Fix suffix bug (last_name from API `lastName`, `suffix` column). Corrected/multi-subreddit fanbases (Mets, Athletics); team_subreddits.csv schema `fanbase, subreddit, team_id, status`.
+- 2026-11-16T00:00Z [CODE] Roster snapshot = Thursday of each Mon-Sun week (mid-week) so mid-week trades split evenly rather than lagging a week. Stats `team` column = team on that week's roster.
+
 ## [PROGRESS]
 - 2026-08-18T00:00Z [CODE] Scaffolded ~/Developer/mlb-fan-sentiment: fansent CLI (rosters, stats, reddit-dump, reddit-live, news, score, correlate), tests, Dockerfile, Makefile, README.
 - 2026-08-18T00:00Z [TOOL] Verified: ruff clean, 9/9 pytest pass; live smokes OK (rosters=108 players 2025 fullSeason, stats gameLog->weekly OPS, GDELT timelinetone real data); synthetic end-to-end recovered planted lagged signal (r_partial=0.99), control pitcher correctly excluded.

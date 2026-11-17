@@ -25,10 +25,26 @@ INHERITED = "reply_inherited"
 TEAM_SUBREDDITS_PATH = Path(__file__).with_name("team_subreddits.csv")
 
 
-def load_team_subreddits(path: Path = TEAM_SUBREDDITS_PATH) -> dict[str, frozenset[int] | None]:
-    """subreddit (lower-cased: Reddit names are case-insensitive) -> {team_id}."""
+def load_team_subreddit_rows(path: Path = TEAM_SUBREDDITS_PATH) -> list[dict]:
     with open(path, newline="", encoding="utf-8") as f:
-        return {r["subreddit"].lower(): frozenset({int(r["team_id"])}) for r in csv.DictReader(f)}
+        return list(csv.DictReader(f))
+
+
+def load_team_subreddits(path: Path = TEAM_SUBREDDITS_PATH) -> dict[str, str]:
+    """subreddit (lower-cased: Reddit names are case-insensitive) -> fanbase name. Several
+    subreddits may share one fanbase (Mets, Athletics)."""
+    return {r["subreddit"].lower(): r["fanbase"] for r in load_team_subreddit_rows(path)}
+
+
+def load_fanbase_teams(path: Path = TEAM_SUBREDDITS_PATH) -> dict[str, frozenset[int]]:
+    """fanbase (lower-cased) -> {team_id}."""
+    out: dict[str, set[int]] = {}
+    for r in load_team_subreddit_rows(path):
+        out.setdefault(r["fanbase"].lower(), set()).add(int(r["team_id"]))
+    return {k: frozenset(v) for k, v in out.items()}
+
+
+WeeklyTeams = frozenset[tuple[str, str, int]]  # (player_id, week_start ISO Monday, team_id)
 
 
 # Weekly weight units as written by stats.py: PA (OPS), AB (AVG), IP (ERA, WHIP), chances,
@@ -67,7 +83,10 @@ class PanelConfig:
     # team ids, keys lower-case; a fanbase absent from the map or mapped to None is league-wide
     # (baseball, news) rather than an error, so non-team sources and new subs keep working. {}
     # disables the filter (`--all-teams`).
-    fanbase_teams: Mapping[str, frozenset[int] | None] = field(default_factory=load_team_subreddits)
+    fanbase_teams: Mapping[str, frozenset[int] | None] = field(default_factory=load_fanbase_teams)
+    # subreddit (lower-case) -> fanbase; applied even with the filter off so multi-sub fanbases
+    # (Mets, Athletics) aggregate into one unit.
+    subreddit_fanbase: Mapping[str, str] = field(default_factory=load_team_subreddits)
     min_weeks: int = 8
     min_units_per_fanbase: int = 3
     # Reply comments inherit the player from the parent comment; 1.0 treats them like explicit
@@ -87,35 +106,58 @@ def _day(s: pd.Series) -> pd.Series:
     return pd.to_datetime(s, utc=False).dt.tz_localize(None).dt.normalize()
 
 
-def fanbase_of(source: pd.Series, subreddit: pd.Series) -> pd.Series:
+def fanbase_of(
+    source: pd.Series, subreddit: pd.Series, subreddit_fanbase: Mapping[str, str] | None = None
+) -> pd.Series:
     sub = subreddit.fillna("").astype(str).str.strip()
+    if subreddit_fanbase:
+        sub = sub.where(
+            ~sub.str.lower().isin(subreddit_fanbase), sub.str.lower().map(subreddit_fanbase)
+        )
     named = sub.where(sub != "", source.astype(str))
     return named.where(source != NEWS_SOURCE, NEWS_FANBASE)
 
 
 def filter_own_team(
-    scores: pd.DataFrame, cfg: PanelConfig, player_teams: Mapping[str, int] | None
+    scores: pd.DataFrame,
+    cfg: PanelConfig,
+    player_teams: Mapping[str, int] | None,
+    weekly_teams: WeeklyTeams | None = None,
 ) -> tuple[pd.DataFrame, dict[str, int]]:
-    """Drop rows where a team fanbase mentions a player outside its team(s).
+    """Drop rows where a team fanbase mentions a player outside its team.
 
-    player_teams: player_id -> team_id from players.csv (current roster, so a traded player
-    leaves his old team's fanbase). Players missing from the map count as off-team. Returns
-    (kept rows, dropped row count per fanbase)."""
-    fanbase = fanbase_of(scores["source"], scores["subreddit"])
+    weekly_teams (player_teams.csv): a mention counts only if the player was on the fanbase's
+    team in the Monday-week of the text's date, so ex-players drop out after a trade and
+    newcomers count from arrival. Without it, falls back to player_teams (player_id -> team_id
+    from players.csv, the last roster seen). Players missing from the data count as off-team.
+    Returns (kept rows, dropped row count per fanbase)."""
+    fanbase = fanbase_of(scores["source"], scores["subreddit"], cfg.subreddit_fanbase)
     allowed = fanbase.str.lower().map(dict(cfg.fanbase_teams))
     restricted = allowed.notna()
     if not restricted.any():
         return scores, {}
-    if player_teams is None:
-        raise ValueError("player_teams is required when a team fanbase filter applies")
-    team = scores["player_id"].astype(str).map(dict(player_teams))
-    own = pd.Series(
-        [
-            pd.notna(t) and t in a if isinstance(a, frozenset) else False
-            for t, a in zip(team, allowed, strict=True)
-        ],
-        index=scores.index,
-    )
+    pid = scores["player_id"].astype(str)
+    if weekly_teams is not None:
+        week = _day(scores["date"]) - pd.to_timedelta(_day(scores["date"]).dt.weekday, unit="D")
+        week = week.dt.strftime("%Y-%m-%d")
+        own = pd.Series(
+            [
+                isinstance(a, frozenset) and any((p, w, t) in weekly_teams for t in a)
+                for p, w, a in zip(pid, week, allowed, strict=True)
+            ],
+            index=scores.index,
+        )
+    else:
+        if player_teams is None:
+            raise ValueError("player_teams is required when a team fanbase filter applies")
+        team = pid.map(dict(player_teams))
+        own = pd.Series(
+            [
+                pd.notna(t) and t in a if isinstance(a, frozenset) else False
+                for t, a in zip(team, allowed, strict=True)
+            ],
+            index=scores.index,
+        )
     drop = restricted & ~own
     counts = fanbase[drop].value_counts()
     return scores[~drop], {str(k): int(v) for k, v in counts.items()}
@@ -172,7 +214,7 @@ def sentiment_periods(
     Weekly periods are Mon-Sun, labelled by Monday (matches stats.csv `week_start`); monthly
     periods by first of month. Mean is weighted by attribution (see PanelConfig)."""
     rows = attach_attribution(scores, sidecars, cfg.reply_inherited_weight)
-    rows["fanbase"] = fanbase_of(rows["source"], rows["subreddit"])
+    rows["fanbase"] = fanbase_of(rows["source"], rows["subreddit"], cfg.subreddit_fanbase)
     day = _day(rows["date"])
     weekly = _aggregate(rows, day - pd.to_timedelta(day.dt.weekday, unit="D"))
     monthly = _aggregate(rows, day.dt.to_period("M").dt.to_timestamp())
