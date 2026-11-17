@@ -2,6 +2,7 @@
 
 ## 2026-11-17
 
+- Pre-registered the confirmatory league-wide fielding test (`docs/preregistration.md`), written before any non-Cubs/Red Sox data was analyzed.
 - `fansent correlate`: `--chains/--iter/--burn` for the main fit (defaults raised to 4 x 6000,
   burn 3000, `InferenceConfig` too; max R-hat 1.015 on real data vs 1.084 at 2000 iterations),
   `--perm-iter/--perm-burn` for the permutation fits (defaults unchanged).
