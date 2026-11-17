@@ -12,6 +12,7 @@ from .util import (
     MODELS_DIR,
     PLAYERS_FILE,
     RELEVANCE_MODEL_FILE,
+    TEAMS_FILE,
     resolve_data_dir,
 )
 
@@ -173,10 +174,65 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--no-composite", action="store_true", help="Skip the COMPOSITE index")
     p.add_argument("--oaa", help="OAA monthly CSV (default: <data-dir>/oaa_monthly.csv if present)")
     p.add_argument("--perm-b", type=int, default=1000, help="Permutation replicates per metric")
+    p.add_argument("--chains", type=int, default=4, help="Chains for the main fit")
+    p.add_argument("--iter", type=int, default=6000, help="Iterations per chain, main fit")
+    p.add_argument("--burn", type=int, default=3000, help="Burn-in per chain, main fit")
+    p.add_argument(
+        "--perm-iter", type=int, default=600, help="Iterations per chain, permutation fits"
+    )
+    p.add_argument("--perm-burn", type=int, default=300, help="Burn-in per chain, permutation fits")
+    p.add_argument(
+        "--teams",
+        nargs="+",
+        metavar="TEAM_ID|ABBR",
+        help="Keep only sentiment rows whose player was on one of these teams in the Mon-Sun "
+        "week of the text date (player_teams.csv; abbreviations via teams.csv)",
+    )
+    p.add_argument(
+        "--pool-stats",
+        choices=["league", "teams"],
+        default="league",
+        help="COMPOSITE z-score pool: every player (league) or only the players left after "
+        "--teams/--fanbases/--exclude-fanbases (teams)",
+    )
+    p.add_argument(
+        "--fanbases", nargs="+", metavar="NAME", help="Include only these fanbases (e.g. Yankees)"
+    )
+    p.add_argument(
+        "--exclude-fanbases",
+        nargs="+",
+        default=[],
+        metavar="NAME",
+        help="Drop these fanbases (e.g. news)",
+    )
     p.add_argument("--workers", type=int, default=1, help="Processes for the permutation null")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--correction", choices=["bh", "holm"], default="bh")
     p.add_argument("--alpha", type=float, default=0.05)
+
+    p = sub.add_parser(
+        "power",
+        help="Simulated power / minimum detectable effect of the fanbase test",
+    )
+    p.add_argument("--reps", type=int, default=100, help="Simulated datasets per grid point")
+    p.add_argument("--workers", type=int, default=1)
+    p.add_argument("--seed", type=int, default=0)
+    p.add_argument(
+        "--scenarios",
+        nargs="+",
+        default=["team", "baseball", "league", "pooled"],
+        help="team, baseball, league, pooled, pitching",
+    )
+    p.add_argument("--mus", nargs="+", type=float, help="True fanbase effects (sd per sd)")
+    p.add_argument("--pooled-mus", nargs="+", type=float, help="Grid for the pooled scenario")
+    p.add_argument("--league-units", type=int, default=25, help="Units per fanbase, league")
+    p.add_argument("--league-fanbases", type=int, default=30)
+    p.add_argument("--tau", type=float, default=0.1, help="Between-player slope sd")
+    p.add_argument("--sigma", type=float, default=1.0, help="Residual noise sd (signal sd ~0.3)")
+    p.add_argument("--perm-b", type=int, default=0, help="Confirm with permutation test at B")
+    p.add_argument("--perm-reps", type=int, default=10, help="Replicates per point to confirm")
+    p.add_argument("--target", type=float, default=0.8)
+    p.add_argument("--out-dir", help="Where to write power_*.csv (default: data dir)")
 
     p = sub.add_parser(
         "snapshot",
@@ -312,6 +368,27 @@ def main(argv: list[str] | None = None) -> None:
             else site.latest_snapshot(site.DEFAULT_PUBLISHED_DIR)
         )
         print(f"wrote {site.build_site(snap_path, Path(args.out))} from {snap_path}")
+    elif args.command == "power":
+        from . import power
+
+        power.run(
+            data_dir,
+            power.PowerConfig(
+                reps=args.reps,
+                seed=args.seed,
+                workers=args.workers,
+                dgp=power.Dgp(tau=args.tau, sigma=args.sigma),
+                perm_b=args.perm_b,
+                perm_reps=args.perm_reps,
+                target=args.target,
+            ),
+            args.scenarios,
+            tuple(args.mus or power.DEFAULT_MUS),
+            tuple(args.pooled_mus or power.DEFAULT_POOLED_MUS),
+            args.league_units,
+            args.league_fanbases,
+            Path(args.out_dir) if args.out_dir else None,
+        )
     elif args.command == "correlate":
         if args.method == "partial":
             from . import analyze
@@ -322,6 +399,16 @@ def main(argv: list[str] | None = None) -> None:
             from .inference import InferenceConfig
             from .panel import PanelConfig
 
+            if not 0 < args.burn < args.iter or not 0 < args.perm_burn < args.perm_iter:
+                raise SystemExit("burn must be positive and smaller than iter")
+            scope = correlate.Scope(
+                teams=correlate.resolve_teams(args.teams, data_dir / TEAMS_FILE)
+                if args.teams
+                else None,
+                fanbases=frozenset(args.fanbases) if args.fanbases else None,
+                exclude_fanbases=frozenset(args.exclude_fanbases),
+                pool_stats=args.pool_stats,
+            )
             correlate.run(
                 PanelConfig(
                     min_mentions=args.min_mentions,
@@ -330,13 +417,23 @@ def main(argv: list[str] | None = None) -> None:
                     reply_inherited_weight=args.reply_weight,
                     **({"fanbase_teams": {}} if args.all_teams else {}),
                 ),
-                InferenceConfig(perm_b=args.perm_b, workers=args.workers, seed=args.seed),
+                InferenceConfig(
+                    n_chains=args.chains,
+                    n_iter=args.iter,
+                    burn=args.burn,
+                    perm_iter=args.perm_iter,
+                    perm_burn=args.perm_burn,
+                    perm_b=args.perm_b,
+                    workers=args.workers,
+                    seed=args.seed,
+                ),
                 args.metrics,
                 not args.no_composite,
                 Path(args.oaa) if args.oaa else None,
                 args.correction,
                 args.alpha,
                 data_dir,
+                scope,
             )
 
 

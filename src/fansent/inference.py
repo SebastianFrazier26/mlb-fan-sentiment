@@ -27,8 +27,8 @@ from .panel import oriented
 @dataclass(frozen=True)
 class InferenceConfig:
     n_chains: int = 4
-    n_iter: int = 2000
-    burn: int = 1000
+    n_iter: int = 6000
+    burn: int = 3000
     perm_b: int = 1000
     perm_chains: int = 2
     perm_iter: int = 600

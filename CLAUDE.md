@@ -21,6 +21,7 @@ progress; read at session start, update on meaningful deltas).
 - `src/fansent/analyze.py` — legacy lagged partial correlations (`correlate --method partial`)
 - `src/fansent/panel.py`, `composite.py`, `inference.py`, `multitest.py`, `correlate.py` — panel builder, composite index, fit + permutation null, BH/Holm, `correlate` orchestration
 - `src/fansent/hierarchical.py` — Gibbs-sampled hierarchical model (`fit` -> `FitResult`); `diagnostics.py` (split-R-hat, bulk ESS); `model_data.py` (panel -> arrays)
+- `src/fansent/power.py` — `fansent power`: simulated power curves and MDE of the fanbase test
 - `src/fansent/names.py`, `util.py` — name matching, paths, CSV I/O (also imported by `fansent-collect`)
 - `src/fansent/label.py` — `fansent label`: localhost-only labeling page for eval CSVs (data stays local, gitignored)
 - `src/fansent/site.py` — `fansent snapshot` (run -> aggregate-only `results/published/<run-id>.json`, schema-validated) and `fansent site` (snapshot -> static `site/`, gitignored); only aggregate numbers may ever be published

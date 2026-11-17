@@ -16,8 +16,10 @@ from .inference import InferenceConfig, MetricResult, analyze_metric
 from .multitest import benjamini_hochberg, holm
 from .panel import (
     PanelConfig,
+    _day,
     build_oaa_panel,
     build_weekly_panel,
+    fanbase_of,
     filter_own_team,
     sentiment_periods,
 )
@@ -61,6 +63,75 @@ FANBASE_COLS = [
     "n_obs",
     "rhat_max",
 ]
+
+
+POOL_LEAGUE = "league"
+POOL_TEAMS = "teams"
+
+
+@dataclass(frozen=True)
+class Scope:
+    """Restricts which sentiment rows are analysed (defaults = whole league, every fanbase).
+
+    teams: keep rows whose (player, Monday-week of the text date) is on one of these team ids.
+    fanbases / exclude_fanbases: case-insensitive fanbase names, include-only / drop.
+    pool_stats: COMPOSITE z-score pool; "teams" z-scores over only the players left after
+    the teams and fanbase filters (before the own-team filter), "league" over every player."""
+
+    teams: frozenset[int] | None = None
+    fanbases: frozenset[str] | None = None
+    exclude_fanbases: frozenset[str] = frozenset()
+    pool_stats: str = POOL_LEAGUE
+
+
+WHOLE_LEAGUE = Scope()
+
+
+def resolve_teams(tokens: list[str], teams_path: Path) -> frozenset[int]:
+    """Team ids or abbreviations (teams.csv `team`, case-insensitive) -> team ids."""
+    abbr: dict[str, int] = {}
+    if teams_path.exists():
+        df = pd.read_csv(teams_path, dtype=str)
+        abbr = {a.upper(): int(i) for i, a in zip(df["team_id"], df["team"], strict=True)}
+    out = set()
+    for tok in tokens:
+        if tok.isdigit():
+            out.add(int(tok))
+        elif tok.upper() in abbr:
+            out.add(abbr[tok.upper()])
+        else:
+            raise SystemExit(
+                f"unknown team {tok!r}: not a team id or an abbreviation in {teams_path}"
+            )
+    return frozenset(out)
+
+
+def apply_scope(
+    scores: pd.DataFrame,
+    scope: Scope,
+    pcfg: PanelConfig,
+    weekly_teams: frozenset[tuple[str, str, int]] | None,
+) -> pd.DataFrame:
+    if scope.fanbases is not None or scope.exclude_fanbases:
+        fb = fanbase_of(scores["source"], scores["subreddit"], pcfg.subreddit_fanbase).str.lower()
+        keep = pd.Series(True, index=scores.index)
+        if scope.fanbases is not None:
+            keep &= fb.isin({f.lower() for f in scope.fanbases})
+        keep &= ~fb.isin({f.lower() for f in scope.exclude_fanbases})
+        scores = scores[keep]
+    if scope.teams is not None:
+        if weekly_teams is None:
+            raise SystemExit("--teams needs player_teams.csv (run `fansent rosters`).")
+        day = _day(scores["date"])
+        week = (day - pd.to_timedelta(day.dt.weekday, unit="D")).dt.strftime("%Y-%m-%d")
+        on_team = {(p, w) for p, w, t in weekly_teams if t in scope.teams}
+        keep = [
+            (p, w) in on_team for p, w in zip(scores["player_id"].astype(str), week, strict=True)
+        ]
+        scores = scores[keep]
+    if scores.empty:
+        raise SystemExit("--teams/--fanbases/--exclude-fanbases left no sentiment rows.")
+    return scores
 
 
 @dataclass
@@ -132,8 +203,12 @@ def analyze(
     include_composite: bool = True,
     player_teams: Mapping[str, int] | None = None,
     weekly_teams: frozenset[tuple[str, str, int]] | None = None,
+    scope: Scope = WHOLE_LEAGUE,
 ) -> Outputs:
     t0 = time.perf_counter()
+    scores = apply_scope(scores, scope, pcfg, weekly_teams)
+    if scope.pool_stats == POOL_TEAMS:
+        stats = stats[stats["player_id"].astype(str).isin(set(scores["player_id"].astype(str)))]
     scores, dropped = filter_own_team(scores, pcfg, player_teams, weekly_teams)
     weekly_sent, monthly_sent = sentiment_periods(scores, sidecars, pcfg)
     panel = build_weekly_panel(stats, weekly_sent, pcfg, metrics, include_composite)
@@ -195,6 +270,7 @@ def run(
     correction: str,
     alpha: float,
     data_dir: Path = DEFAULT_DATA_DIR,
+    scope: Scope = WHOLE_LEAGUE,
 ) -> None:
     stats = pd.read_csv(data_dir / STATS_FILE, dtype={"player_id": str})
     sentiment_csv = data_dir / SENTIMENT_FILE
@@ -212,7 +288,10 @@ def run(
     out = analyze(
         stats, scores, [s for s in sidecars if s is not None], oaa, pcfg, icfg, metrics,
         include_composite, read_player_teams(data_dir / PLAYERS_FILE),
-        read_weekly_teams(data_dir / PLAYER_TEAMS_FILE) if pcfg.fanbase_teams else None,
+        read_weekly_teams(data_dir / PLAYER_TEAMS_FILE)
+        if pcfg.fanbase_teams or scope.teams is not None
+        else None,
+        scope,
     )  # fmt: skip
     fanbases_out, units_out, oaa_out = (
         data_dir / FANBASES_OUT,
