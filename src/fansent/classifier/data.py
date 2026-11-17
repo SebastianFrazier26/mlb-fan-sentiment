@@ -1,5 +1,5 @@
 """Labeled-example loading. Label files are CSVs: text, player, player_id, final_label |
-draft_label, optional aliases (';'-separated). Other columns (parent_text, ...) are ignored."""
+draft_label, optional aliases (';'-separated), optional parent_text (reply context). Other columns are ignored."""
 
 from __future__ import annotations
 
@@ -32,6 +32,8 @@ class Example:
     player_id: str = ""
     aliases: tuple[str, ...] = ()
     label: str | None = None
+    parent_text: str = ""
+    subreddit: str = ""
 
 
 def normalize_label(raw: str) -> str:
@@ -41,8 +43,9 @@ def normalize_label(raw: str) -> str:
     return _LABEL_ALIASES[key]
 
 
-def load_labeled(paths: list[Path]) -> tuple[list[Example], int]:
-    """Returns (examples with label in pos/neu/neg, number of 'na' rows dropped)."""
+def load_labeled(paths: list[Path], keep_na: bool = False) -> tuple[list[Example], int]:
+    """Returns (examples, number of 'na' rows). 'na' rows are dropped unless ``keep_na``
+    (the relevance task trains on them); either way the count covers them."""
     out: list[Example] = []
     n_na = 0
     for path in paths:
@@ -57,7 +60,8 @@ def load_labeled(paths: list[Path]) -> tuple[list[Example], int]:
                     raise ValueError(f"{path}:{i}: {e}") from None
                 if label == "na":
                     n_na += 1
-                    continue
+                    if not keep_na:
+                        continue
                 aliases = tuple(
                     a.strip() for a in (row.get("aliases") or "").split(";") if a.strip()
                 )
@@ -68,6 +72,8 @@ def load_labeled(paths: list[Path]) -> tuple[list[Example], int]:
                         player_id=str(row.get("player_id") or ""),
                         aliases=aliases,
                         label=label,
+                        parent_text=(row.get("parent_text") or "").strip(),
+                        subreddit=(row.get("subreddit") or "").strip(),
                     )
                 )
     return out, n_na

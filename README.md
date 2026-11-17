@@ -49,6 +49,42 @@ is unchanged.
   multinomial logistic regression with balanced class weights, fit by L-BFGS on our own
   loss/gradient. Score = P(pos) - P(neg).
 
+Optional feature blocks (each off by default, combinable, weights tuned by CV on the
+training data only): `--lex` adds baseball-lexicon scores, `--parent` adds the parent
+comment's TF-IDF plus an `is_reply` flag (needs a `parent_text` column in the labeled CSV),
+and `--emb` adds mean fastText vectors of the comment and the target window. `--emb` needs the
+pretrained model once: `uv run fansent clf-fetch-embeddings` (5.8 GB download, 7.2 GB on disk
+in `<data-dir>/embeddings/`, gitignored; `--emb-path` points elsewhere). Out-of-vocabulary
+words get vectors from their character n-grams, via our own reader of the `.bin` format.
+`fansent score` feeds `--parent` models the parent text of `reply_inherited` rows (see
+"Where the text data comes from"); explicit rows are non-replies, as in training.
+
+### Relevance filter
+
+A matched surname is often someone else: with a Cubs + Red Sox roster, "Martinez" or
+"Turner" in r/baseball usually means a player we do not track (~39% of Sonnet-labeled
+r/baseball matches are `na`, ~3% in the team subs). A second from-scratch classifier (same
+L2 logistic regression and L-BFGS) predicts whether a matched comment is about the matched
+player. Its features keep the name context that sentiment masking hides: match type (full
+name, alias, surname only), the words next to the mention, whether the preceding word is
+another first name or capitalized word, mention casing, own-team versus other-team terms
+(all 30 clubs, `classifier/teams.py`) in the comment and its parent, whether the parent
+names the player, and the subreddit (dense flags are duplicated for r/baseball so it learns
+its own rules), plus word TF-IDF. Labels: `na` vs pos/neu/neg from the labeled CSVs.
+
+```sh
+uv run fansent clf-eval  --task relevance --train a.csv b.csv --test test.csv  # holdout + test report
+uv run fansent clf-train --task relevance --train a.csv b.csv                  # -> <data-dir>/models/relevance.npz
+uv run fansent score --scorer clf          # uses relevance.npz automatically if present
+```
+
+The drop threshold is chosen on out-of-fold CV scores: `--operating-point precision`
+(default; lowest threshold with CV precision >= `--min-precision`, 0.8) or `f1`. `fansent score`
+drops rows with P(na) >= threshold before scoring, prints kept/dropped counts per subreddit,
+and writes `relevance.csv` (`text_id, player_id, p_relevant, kept`) for audits and sensitivity
+checks. `sentiment.csv` keeps its schema. `--relevance-model PATH` overrides the model,
+`--no-relevance` disables the filter. A stale `relevance.csv` from an earlier run is not removed.
+
 Labeled CSV schema (`text, player, player_id, final_label` or `draft_label`, optional
 `aliases` as `;`-separated nicknames; `na` rows are excluded from training and evaluation):
 
@@ -79,6 +115,11 @@ Reddit and news collection lives in a separate, private companion repo
 - `reddit_attribution.csv` (optional) — `text_id, player_id, attribution, parent_id`;
   `attribution` is `explicit` or `reply_inherited` (player named in the parent comment)
 - `news_headlines.csv` (optional) — `text_id, player_id, url, domain, attribution, seendate`
+- `parent_texts.csv` (optional) — `parent_id, text`; the comment each `reply_inherited` row
+  replies to (`parent_id` as in `reddit_attribution.csv`). Only `fansent score --scorer clf`
+  with a `--parent` model reads it: matching rows get `is_reply=1` and the parent-text block,
+  truncated to the first 300 characters (the `parent_text` length of the training samples).
+  Without it, those rows are scored as non-replies and a warning gives how many.
 
 A missing sidecar means every mention counts as explicit. `fansent score` turns `texts.csv`
 into `sentiment.csv` (VADER compound per text x player).

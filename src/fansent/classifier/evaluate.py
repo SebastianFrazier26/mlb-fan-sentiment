@@ -10,6 +10,7 @@ import numpy as np
 from scipy.stats import spearmanr
 
 from .data import LABELS, Example, load_labeled
+from .embeddings import TokenVectors
 from .pipeline import CLASSES, ClfConfig, SentimentClassifier
 from .scorers import ClfScorer, LexiconScorer, VaderScorer
 from .text import Masker
@@ -110,16 +111,18 @@ def format_report(results: dict[str, Metrics]) -> str:
     return "\n".join(lines)
 
 
-def grouped_folds(examples: list[Example], k: int, seed: int) -> list[np.ndarray]:
+def grouped_folds(
+    examples: list[Example], k: int, seed: int, strata=lambda e: e.label
+) -> list[np.ndarray]:
     """Folds that keep identical texts together (the same text can appear for several players,
-    and a split across train/test would leak), stratified by each group's first label."""
+    and a split across train/test would leak), stratified by ``strata`` of each group's first example (default: its label)."""
     rng = np.random.default_rng(seed)
     groups: dict[str, list[int]] = {}
     for i, e in enumerate(examples):
         groups.setdefault(e.text, []).append(i)
-    by_label: dict[str, list[list[int]]] = {}
+    by_label: dict = {}
     for g in groups.values():
-        by_label.setdefault(examples[g[0]].label, []).append(g)
+        by_label.setdefault(strata(examples[g[0]]), []).append(g)
     folds: list[list[int]] = [[] for _ in range(k)]
     j = 0
     for label in sorted(by_label):
@@ -141,6 +144,9 @@ class Grid:
     windows: tuple[int, ...] = (0, 3, 5)
     char_ngrams: tuple[str, ...] = ("0-0", "3-5")
     word_ngrams: tuple[str, ...] = ("1-2",)
+    emb_weights: tuple[float, ...] = (1.0, 2.0)
+    lex_weights: tuple[float, ...] = (1.0, 2.0)
+    parent_weights: tuple[float, ...] = (0.5, 1.0)
 
 
 def tune(
@@ -151,15 +157,34 @@ def tune(
     folds: int = 5,
     seed: int = 0,
     log=print,
+    vectors: TokenVectors | None = None,
 ) -> tuple[ClfConfig, list[tuple[ClfConfig, float]]]:
     """Grouped k-fold CV over the grid, scored by mean macro-F1. Features are fitted once per
-    (feature config, fold) and reused across C."""
+    (feature config, fold) and reused across C. Block weights are enumerated only for blocks
+    enabled in ``base.features``; ``vectors`` is shared so each token is looked up once."""
     grid, base = grid or Grid(), base or ClfConfig()
+    bf = base.features
+    weights = itertools.product(
+        grid.emb_weights if bf.emb else (bf.emb_weight,),
+        grid.lex_weights if bf.lex else (bf.lex_weight,),
+        grid.parent_weights if bf.parent else (bf.parent_weight,),
+    )
+    weights = list(weights)
     splits = grouped_folds(examples, folds, seed)
     y = y_of(examples)
     results: list[tuple[ClfConfig, float]] = []
-    for wn, cn, win in itertools.product(grid.word_ngrams, grid.char_ngrams, grid.windows):
-        feats = replace(base.features, word_ngrams=_span(wn), char_ngrams=_span(cn), window=win)
+    for wn, cn, win, (we, wl, wp) in itertools.product(
+        grid.word_ngrams, grid.char_ngrams, grid.windows, weights
+    ):
+        feats = replace(
+            bf,
+            word_ngrams=_span(wn),
+            char_ngrams=_span(cn),
+            window=win,
+            emb_weight=we,
+            lex_weight=wl,
+            parent_weight=wp,
+        )
         scores: dict[float, list[float]] = {c: [] for c in grid.Cs}
         for held in splits:
             mask = np.zeros(len(examples), dtype=bool)
@@ -167,14 +192,17 @@ def tune(
             train = [e for e, m in zip(examples, mask, strict=True) if not m]
             test = [e for e, m in zip(examples, mask, strict=True) if m]
             for c in grid.Cs:
-                model = SentimentClassifier(replace(base, C=c, features=feats), masker)
+                model = SentimentClassifier(replace(base, C=c, features=feats), masker, vectors)
                 model.fit(train)
                 pred = model.predict_proba(test).argmax(axis=1)
                 scores[c].append(macro_f1(y[mask], pred))
         for c, s in scores.items():
             cfg = replace(base, C=c, features=feats)
             results.append((cfg, float(np.mean(s))))
-            log(f"cv word={wn} char={cn} win={win} C={c:g}: macro-F1 {np.mean(s):.3f}")
+            log(
+                f"cv word={wn} char={cn} win={win} w(emb,lex,par)=({we:g},{wl:g},{wp:g}) "
+                f"C={c:g}: macro-F1 {np.mean(s):.3f}"
+            )
     best = max(results, key=lambda r: r[1])
     return best[0], results
 
@@ -188,24 +216,36 @@ def load_players(path: Path | None) -> list[dict]:
         return list(csv.DictReader(f))
 
 
-def _prepare(train: list[Path], players: Path | None, cv: int, grid: Grid, seed: int):
+def _prepare(
+    train: list[Path],
+    players: Path | None,
+    cv: int,
+    grid: Grid,
+    seed: int,
+    base: ClfConfig | None = None,
+    vectors: TokenVectors | None = None,
+):
     examples, n_na = load_labeled(train)
     if not examples:
         raise SystemExit("no trainable rows (all na or empty)")
     print(f"train: {len(examples)} rows ({n_na} 'na' rows excluded)")
     masker = Masker(load_players(players))
-    cfg = ClfConfig()
+    cfg = base or ClfConfig()
     if cv > 1:
-        cfg, _ = tune(examples, masker, grid, folds=cv, seed=seed)
+        cfg, _ = tune(examples, masker, grid, cfg, folds=cv, seed=seed, vectors=vectors)
+        f = cfg.features
         print(
-            f"best: C={cfg.C:g} window={cfg.features.window} "
-            f"char={cfg.features.char_ngrams} word={cfg.features.word_ngrams}"
+            f"best: C={cfg.C:g} window={f.window} char={f.char_ngrams} word={f.word_ngrams} "
+            f"emb={f.emb}({f.emb_weight:g}) lex={f.lex}({f.lex_weight:g}) "
+            f"parent={f.parent}({f.parent_weight:g})"
         )
-    return SentimentClassifier(cfg, masker).fit(examples)
+    return SentimentClassifier(cfg, masker, vectors).fit(examples)
 
 
-def run_eval(train, test, players, cv, grid, seed, save_model=None) -> None:
-    model = _prepare(train, players, cv, grid, seed)
+def run_eval(
+    train, test, players, cv, grid, seed, save_model=None, base=None, vectors=None
+) -> None:
+    model = _prepare(train, players, cv, grid, seed, base, vectors)
     if save_model:
         model.save(save_model)
     held, n_na = load_labeled([test])
@@ -214,7 +254,7 @@ def run_eval(train, test, players, cv, grid, seed, save_model=None) -> None:
     print(format_report({s.name: evaluate(s, held) for s in scorers}))
 
 
-def run_train(train, out, players, cv, grid, seed) -> None:
-    model = _prepare(train, players, cv, grid, seed)
+def run_train(train, out, players, cv, grid, seed, base=None, vectors=None) -> None:
+    model = _prepare(train, players, cv, grid, seed, base, vectors)
     model.save(out)
     print(f"saved {out}")

@@ -1,5 +1,40 @@
 # Changelog
 
+## 2026-11-16
+
+- `fansent score --scorer clf` with an `--emb` model now loads
+  `<data-dir>/embeddings/crawl-300d-2M-subword.bin` for tokens not cached in the model file.
+  Before, those tokens silently got no embedding at scoring time (unlike `clf-eval`). Missing
+  `.bin`: stderr warning, cache-only vectors.
+- Relevance filter: `clf-train` / `clf-eval --task relevance` train a second classifier that
+  predicts whether a matched comment is about the matched player (`na`: surname collision with
+  a non-roster player, ordinary word, pun). `fansent score` loads
+  `<data-dir>/models/relevance.npz` if present (`--relevance-model`, `--no-relevance`), drops
+  rows predicted `na` before scoring, prints kept/dropped per subreddit, and writes the audit
+  sidecar `relevance.csv` (`text_id, player_id, p_relevant, kept`). `sentiment.csv` unchanged.
+  `Example` gains `subreddit`; `load_labeled(keep_na=True)`.
+- `fansent score --scorer clf` with a `--parent` model now scores `reply_inherited` rows
+  (per `reddit_attribution.csv`) with their parent comment, via the new optional sidecar
+  `parent_texts.csv` (`parent_id, text`), truncated to 300 characters. Explicit rows stay
+  non-replies. If the sidecar is missing or lacks parents, those rows fall back to non-reply
+  scoring with a stderr warning giving the count. `texts.csv` and `sentiment.csv` unchanged.
+
+## 2026-11-15
+
+- Classifier: three optional, toggleable feature blocks (`clf-eval` / `clf-train` flags
+  `--emb`, `--lex`, `--parent`), stacked with the TF-IDF blocks via `scipy.sparse.hstack` with
+  per-block weights that join the CV grid (`--emb-weights`, `--lex-weights`, `--parent-weights`).
+  `--emb`: mean fastText vectors of the masked comment and of the +-4 target window
+  (placeholders excluded, unit-normalised). `--lex`: baseball-lexicon VADER compound of the
+  comment and of the target window plus log counts of positive/negative lexicon hits.
+  `--parent`: TF-IDF of the parent comment (masked for the same target) plus an `is_reply` flag.
+  Labeled CSVs may now carry `parent_text`. Saved models include the token vectors they used,
+  so scoring does not need the fastText file for tokens seen in training. Old `clf.npz` files load.
+- New `fansent clf-fetch-embeddings`: downloads (resumable) and extracts the official fastText
+  `crawl-300d-2M-subword` model into `<data-dir>/embeddings/` (5.8 GB download, 7.2 GB `.bin`).
+  The `.bin` is read by our own reader (`classifier/embeddings.py`; subword hashing included),
+  so there is no `fasttext` package dependency.
+
 ## 2026-10-22
 
 - Results site: snapshots carry a required `status` (`preliminary` | `final`, validated;

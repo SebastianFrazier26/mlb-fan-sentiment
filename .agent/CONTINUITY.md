@@ -44,3 +44,6 @@
 
 ## [OUTCOMES]
 - 2026-08-18T00:00Z [CODE] MVP pipeline built and verified (unit + synthetic e2e + live smokes). Remaining: user torrents Reddit .zst dumps (baseball/CHICubs/redsox) and runs reddit-dump -> score -> correlate; optional reddit-live creds; top-100 player list; Docker build unverified.
+- 2026-11-15T00:00Z [USER] Classifier gets optional feature blocks (fastText subword vectors, lexicon scores, parent-context TF-IDF), keeping our own logistic regression; selection by training-data CV only, never test_300.
+- 2026-11-16T00:00Z [USER] Relevance filter approved: own second classifier (same numpy LR stack) predicts whether a matched comment is about the matched player vs `na`; `score` drops predicted-na rows and writes `relevance.csv`; threshold chosen on training CV only (default precision>=0.8 operating point), never on test_300.
+- 2026-11-15T00:00Z [CODE] Branch feat/clf-features: own fastText .bin reader (no `fasttext` dependency: archived upstream, C++ sdist), `clf-fetch-embeddings`, `--emb/--lex/--parent`, block weights in Grid.
