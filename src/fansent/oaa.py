@@ -1,10 +1,9 @@
-"""Load a Baseball Savant Outs Above Average CSV export (monthly splits) into a tidy
-player-month table. Read-only: downloading belongs in the private collector repo.
-
-Savant's leaderboard export names the id column `player_id` (MLBAM id, the same id
-the Stats API uses) and the metric `outs_above_average`. The month-split layout is not
-documented, so the month may arrive as `month` ("2026-05" / "2026-05-01" / 5 with a
-`year` column) or as a `date`/`game_date`-style column; anything else raises.
+"""Load a Baseball Savant's export (checked 2026-11-17) has one row per fielder-position-month with `player_id`
+(MLBAM id, same as the Stats API), `outs_above_average` and `fielding_runs_prevented`. Months
+are independent splits, not cumulative, and March+April arrive as one bucket labeled 2026-04.
+There is no attempts column; one is read if present but never required. The month may arrive
+as `month` ("2026-05" / "2026-05-01" / 5 with a `year` column) or a `date`/`game_date`-style
+column; anything else raises.
 """
 
 from __future__ import annotations

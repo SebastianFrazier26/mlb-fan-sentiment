@@ -176,15 +176,18 @@ Per metric (OPS, AVG, ERA, WHIP, FLD_PCT, ERRORS, CS_PCT, and a COMPOSITE index)
    sample-size weight.
 6. **OAA check.** Monthly mean sentiment vs next-month Outs Above Average (consecutive months),
    controlling current-month OAA and cumulative season OAA, through the same model and
-   permutation, weighted by next-month attempts. Monthly data gives ~5 points per unit, too few
+   permutation, unweighted (the Savant export has no attempts column). A unit needs >= 3
+consecutive-month pairs (month m with OAA and sentiment, month m+1 with OAA); the cumulative
+control is the sum of the independent monthly values up to m. March and April are one bucket
+labeled 2026-04, so that month is longer than the rest. Monthly data gives ~5 points per unit, too few
    for per-unit partial correlations, so the hierarchical pooling is used instead.
 
 Thresholds below are unconfirmed assumptions rather than tuned values (composite weights, the
 reply weight and the correction families are user decisions of 2026-10-12): weekly minimum sample
 OPS/AVG 10 (PA/AB), ERA/WHIP 3 IP, FLD_PCT/ERRORS 3 chances, CS_PCT 2 attempts; >= 3 mentions
 per player-week; >= 8 weeks per unit; >= 3 units per (metric, fanbase); `reply_inherited`
-mentions weigh the same as explicit ones (`--reply-weight`, user decision 2026-10-12); OAA months need >= 10 mentions,
->= 10 attempts, >= 3 months per unit.
+mentions weigh the same as explicit ones (`--reply-weight`, user decision 2026-10-12); OAA months need >= 10 mentions
+and a unit >= 3 consecutive-month pairs.
 
 Outputs: `analysis_fanbases.csv` (`family, exploratory, metric, fanbase, mu_mean, ci_low, ci_high, p_pos, perm_p,
 q_bh, p_holm, n_units, n_obs, rhat_max`), `analysis_units.csv` (per-unit shrunk effects),
@@ -253,7 +256,8 @@ group are 0. For pitchers `h`/`bb` are hits/walks allowed and `outs` = innings x
 `data/oaa_monthly.csv` — from `uv run fansent oaa PATH` (reads a Baseball Savant Outs Above
 Average CSV export with monthly splits; the download itself lives in the private
 collector): `player_id, full_name, month (first of month), oaa, attempts,
-fielding_runs_prevented`. Rows for several positions in a month are summed.
+fielding_runs_prevented`. Rows for several positions in a month are summed. `attempts` is empty
+for real Savant exports (no such column) and is not used.
 
 ## License
 

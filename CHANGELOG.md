@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-11-17
+
+- OAA check fixed for the real Savant export, which has monthly independent OAA and no attempts
+  column (Mar+Apr arrive as one bucket labeled 2026-04). The OAA family is now unweighted and the
+  10-attempt floor (`min_oaa_attempts`) is removed. A unit needs >= 3 consecutive-month pairs and
+  months need >= 10 mentions (`min_month_mentions`); cumulative season OAA is the running sum of
+  monthly values. `fansent oaa` still reads an `attempts` column if present.
+
 ## 2026-11-16
 
 - League-wide weekly rosters. `fansent rosters --season 2026` now pulls the dated 40-man roster
