@@ -8,6 +8,8 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+POOLED = "pooled"
+
 
 @dataclass
 class ModelInputs:
@@ -38,7 +40,10 @@ def panel_to_inputs(
     fanbase: str = "fanbase",
     player: str = "player_id",
     weight: str | None = None,
+    pool: bool = False,
 ) -> ModelInputs:
+    """pool=True puts every unit in one group named "pooled" (single mu). Units stay
+    (fanbase, player), so a player in two fanbases is two units sharing the same outcomes."""
     cols = [y_next, perf, std, sent, fanbase, player] + ([weight] if weight else [])
     df = panel.dropna(subset=cols)
     units = df.groupby([fanbase, player], sort=True).ngroup().to_numpy()
@@ -46,8 +51,12 @@ def panel_to_inputs(
         {fanbase: df[fanbase], player: df[player], "_u": units}
     ).drop_duplicates()
     unit_df = unit_df.sort_values("_u")
-    fb_names = sorted(unit_df[fanbase].astype(str).unique())
-    fb_idx = unit_df[fanbase].astype(str).map({n: i for i, n in enumerate(fb_names)}).to_numpy()
+    if pool:
+        fb_names = [POOLED]
+        fb_idx = np.zeros(len(unit_df), dtype=int)
+    else:
+        fb_names = sorted(unit_df[fanbase].astype(str).unique())
+        fb_idx = unit_df[fanbase].astype(str).map({n: i for i, n in enumerate(fb_names)}).to_numpy()
     return ModelInputs(
         y_next=df[y_next].to_numpy(float),
         perf=df[perf].to_numpy(float),

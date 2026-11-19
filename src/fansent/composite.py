@@ -86,3 +86,54 @@ def composite_index(
             "higher_is_better",
         ]
     ]
+
+
+FLD_Z = "FLD_Z"
+FLD_Z_METRICS = ("FLD_PCT", "ERRORS")
+
+
+def fielding_index(eligible: pd.DataFrame) -> pd.DataFrame:
+    """Rows in the long stats format with metric 'FLD_Z' (higher = better fielding).
+
+    Each of FLD_PCT and -ERRORS is z-scored pooled over its eligible player-weeks and the two are
+    averaged weighted by the week's chances (their `weight`), over whichever components are
+    present. `weight` of the output is the mean component weight, i.e. week-t chances. The
+    season-to-date control z-scores `std_value` (built from the cumulative std_ counts) against
+    its own pooled distribution, as COMPOSITE does, with the same week-t chances weights, so
+    value and std_value sit on the same scale."""
+    df = eligible[eligible["metric"].isin(FLD_Z_METRICS)].copy()
+    sign = df["higher_is_better"].map({True: 1.0, False: -1.0})
+    for src, dst in (("value", "z"), ("std_value", "zs")):
+        o = df[src] * sign
+        grp = o.groupby(df["metric"])
+        sd = grp.transform("std").replace(0, float("nan"))
+        df[dst] = (o - grp.transform("mean")) / sd
+    df = df[df["z"].notna() & df["zs"].notna() & (df["weight"] > 0)]
+    df["wz"] = df["weight"] * df["z"]
+    df["wzs"] = df["weight"] * df["zs"]
+    g = df.groupby(["player_id", "period"], sort=True)
+    out = pd.DataFrame(
+        {
+            "wz": g["wz"].sum(),
+            "wzs": g["wzs"].sum(),
+            "wsum": g["weight"].sum(),
+            "weight": g["weight"].mean(),
+            "full_name": g["full_name"].first(),
+        }
+    ).reset_index()
+    out["value"] = out["wz"] / out["wsum"]
+    out["std_value"] = out["wzs"] / out["wsum"]
+    out["metric"] = FLD_Z
+    out["higher_is_better"] = True
+    return out[
+        [
+            "player_id",
+            "full_name",
+            "period",
+            "metric",
+            "value",
+            "std_value",
+            "weight",
+            "higher_is_better",
+        ]
+    ]

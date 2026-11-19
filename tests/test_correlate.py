@@ -51,7 +51,7 @@ def test_exploratory_excluded_from_correction():
 
 def test_table_grouped_by_family():
     fb = correct(_fb([("OPS", "a", 0.01), ("CS_PCT", "a", 0.2), ("COMPOSITE", "a", 0.03)]))
-    for c in ("mu_mean", "ci_low", "ci_high", "p_pos", "rhat_max"):
+    for c in ("mu_mean", "ci_low", "ci_high", "p_pos", "rhat_max", "perm_p_less", "perm_p_greater"):
         fb[c] = 0.1
     text = format_table(fb, "bh", 0.05)
     assert text.index("family: COMPOSITE") < text.index("family: metrics")

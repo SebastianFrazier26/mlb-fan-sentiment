@@ -4,7 +4,8 @@ The permutation shuffles sentiment across each unit's own periods, holding y_nex
 fixed, so unit-level sentiment and outcome distributions (marginals) are untouched and only the
 sentiment-to-next-outcome pairing is destroyed. The statistic is the posterior mean of mu_k from a
 light fit; the observed value uses the identical light settings (and its own seed slot) so the
-comparison is like for like. p = (1 + #{|null| >= |obs|}) / (1 + B), two-sided.
+comparison is like for like. perm_p = (1 + #{|null| >= |obs|}) / (1 + B), two-sided;
+perm_p_less / perm_p_greater are the one-sided (1 + #{null <= obs}) / (1 + B) and its mirror.
 
 Seeds: one SeedSequence child per replicate (slot 0 = observed), so results do not depend on
 worker count.
@@ -35,6 +36,10 @@ class InferenceConfig:
     perm_burn: int = 300
     seed: int = 0
     workers: int = 1
+    # Fit all units as one group (single mu) instead of one mu per fanbase.
+    pool_fanbases: bool = False
+    # Which permutation p feeds the multiple-comparison correction and the table marker.
+    alternative: str = "two-sided"
     priors: h.Priors = field(default_factory=h.Priors)
 
 
@@ -112,6 +117,14 @@ def permutation_p(obs: np.ndarray, null: np.ndarray) -> np.ndarray:
     return (1 + (np.abs(null) >= np.abs(obs)[None, :]).sum(axis=0)) / (1 + b)
 
 
+def permutation_p_less(obs: np.ndarray, null: np.ndarray) -> np.ndarray:
+    return (1 + (null <= obs[None, :]).sum(axis=0)) / (1 + null.shape[0])
+
+
+def permutation_p_greater(obs: np.ndarray, null: np.ndarray) -> np.ndarray:
+    return (1 + (null >= obs[None, :]).sum(axis=0)) / (1 + null.shape[0])
+
+
 def analyze_metric(panel: pd.DataFrame, metric: str, cfg: InferenceConfig) -> MetricResult:
     """Fit one metric's panel (rows of a single metric); effects are in the better-performance
     direction on the z-scored scale (sd of oriented next outcome per sd of sentiment)."""
@@ -124,6 +137,7 @@ def analyze_metric(panel: pd.DataFrame, metric: str, cfg: InferenceConfig) -> Me
         std="std",
         sent="sent",
         weight="weight" if use_w else None,
+        pool=cfg.pool_fanbases,
     )
     res = h.fit(
         inp.y_next,
@@ -141,7 +155,6 @@ def analyze_metric(panel: pd.DataFrame, metric: str, cfg: InferenceConfig) -> Me
         **inp.fit_kwargs(),
     )
     obs, null = permutation_null(inp, cfg, zlib.crc32(metric.encode()))
-    perm_p = permutation_p(obs, null)
 
     fb = res.fanbase_summary()
     diag = res.diagnostics()
@@ -160,7 +173,9 @@ def analyze_metric(panel: pd.DataFrame, metric: str, cfg: InferenceConfig) -> Me
             "ci_low": fb["mu_lo95"],
             "ci_high": fb["mu_hi95"],
             "p_pos": fb["p_positive"],
-            "perm_p": perm_p,
+            "perm_p": permutation_p(obs, null),
+            "perm_p_less": permutation_p_less(obs, null),
+            "perm_p_greater": permutation_p_greater(obs, null),
             "n_units": fb["n_units"],
             "n_obs": nobs,
             "rhat_max": rhat_max,
@@ -172,7 +187,7 @@ def analyze_metric(panel: pd.DataFrame, metric: str, cfg: InferenceConfig) -> Me
     units = pd.DataFrame(
         {
             "metric": metric,
-            "fanbase": u["fanbase"],
+            "fanbase": [f for f, _ in inp.unit_names],
             "player_id": pids,
             "full_name": [names.get(p, "") for p in pids],
             "n_obs": u["n_obs"],
