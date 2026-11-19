@@ -27,6 +27,7 @@
 
 - 2026-11-16T00:00Z [USER] Expand to all 30 MLB teams. Track player->team BY WEEK from dated 40-man rosters (`player_teams.csv`); own-team filter uses the team in the week of the mention (supersedes the 2026-10-13 players.csv current-roster rule, which stays as the warned fallback). Fix suffix bug (last_name from API `lastName`, `suffix` column). Corrected/multi-subreddit fanbases (Mets, Athletics); team_subreddits.csv schema `fanbase, subreddit, team_id, status`.
 - 2026-11-16T00:00Z [CODE] Roster snapshot = Thursday of each Mon-Sun week (mid-week) so mid-week trades split evenly rather than lagging a week. Stats `team` column = team on that week's roster.
+- 2026-11-18T00:00Z [USER] Permutation-null fix approved: Freedman-Lane residual permutation is the `correlate` default (`--null {freedman-lane,shuffle}`); two-sided perm_p centered on null median; `confirm` keeps the registered shuffle/uncentered one-sided p and adds FL one-sided + centered p as supplementary post-hoc fields.
 
 ## [PROGRESS]
 - 2026-08-18T00:00Z [CODE] Scaffolded ~/Developer/mlb-fan-sentiment: fansent CLI (rosters, stats, reddit-dump, reddit-live, news, score, correlate), tests, Dockerfile, Makefile, README.
@@ -50,3 +51,4 @@
 - 2026-11-15T00:00Z [USER] Classifier gets optional feature blocks (fastText subword vectors, lexicon scores, parent-context TF-IDF), keeping our own logistic regression; selection by training-data CV only, never test_300.
 - 2026-11-16T00:00Z [USER] Relevance filter approved: own second classifier (same numpy LR stack) predicts whether a matched comment is about the matched player vs `na`; `score` drops predicted-na rows and writes `relevance.csv`; threshold chosen on training CV only (default precision>=0.8 operating point), never on test_300.
 - 2026-11-15T00:00Z [CODE] Branch feat/clf-features: own fastText .bin reader (no `fasttext` dependency: archived upstream, C++ sdist), `clf-fetch-embeddings`, `--emb/--lex/--parent`, block weights in Grid.
+- 2026-11-18T00:00Z [CODE] Branch fix/permutation-null: shuffle null was centered ~+0.03 (sentiment reacts to perf; synthetic react panel rejected 10/10). Implemented FL null in inference.py, centered perm_p, confirm supplementary fields, tests, README/CHANGELOG. Not pushed.

@@ -19,8 +19,8 @@ progress; read at session start, update on meaningful deltas).
 - `src/fansent/sentiment.py` — VADER over `texts.csv` -> `sentiment.csv`
 - `src/fansent/classifier/` — from-scratch target-aware sentiment classifier, lexicon overlay, eval harness (`clf-eval`, `clf-train`, `score --scorer`)
 - `src/fansent/analyze.py` — legacy lagged partial correlations (`correlate --method partial`)
-- `src/fansent/panel.py`, `composite.py`, `inference.py`, `multitest.py`, `correlate.py` — panel builder, composite index, fit + permutation null, BH/Holm, `correlate` orchestration
-- `src/fansent/confirm.py` — `fansent confirm`: the pre-registered confirmatory test (`docs/preregistration.md`), spec hard-coded; never run on league data for exploration
+- `src/fansent/panel.py`, `composite.py`, `inference.py`, `multitest.py`, `correlate.py` — panel builder, composite index, fit + permutation null (Freedman-Lane default, `--null shuffle` legacy; centered two-sided p), BH/Holm, `correlate` orchestration
+- `src/fansent/confirm.py` — `fansent confirm`: the pre-registered confirmatory test (`docs/preregistration.md`), spec hard-coded (registered shuffle null; Freedman-Lane only as supplementary fields); never run on league data for exploration
 - `src/fansent/hierarchical.py` — Gibbs-sampled hierarchical model (`fit` -> `FitResult`); `diagnostics.py` (split-R-hat, bulk ESS); `model_data.py` (panel -> arrays)
 - `src/fansent/power.py` — `fansent power`: simulated power curves and MDE of the fanbase test
 - `src/fansent/names.py`, `util.py` — name matching, paths, CSV I/O (also imported by `fansent-collect`)

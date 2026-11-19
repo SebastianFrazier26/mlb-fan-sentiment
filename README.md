@@ -154,12 +154,17 @@ Per metric (OPS, AVG, ERA, WHIP, FLD_PCT, ERRORS, CS_PCT, and a COMPOSITE index)
    unit = (fanbase, player), `gamma_unit ~ N(mu_fanbase, tau_fanbase^2)`; Gibbs sampler written
    from scratch. `mu_k` is the fanbase effect, reported in sd of next-week performance per sd of
    sentiment (variables are z-scored globally). `p_pos` = posterior P(mu_k > 0).
-3. **Permutation null.** Within each unit sentiment is shuffled across that unit's weeks
-   (y_next, perf, std fixed), the model is refit (light, `store_units=False`), and the posterior
-   mean of each `mu_k` collected; `perm_p = (1 + #{|null| >= |obs|}) / (1 + B)`, two-sided,
-   seeded and independent of worker count. This breaks the sentiment-to-outcome link while
-   preserving each unit's marginals; it also breaks the within-unit sentiment-performance link,
-   so it is a null for "sentiment carries no information", not for "sentiment merely reacts".
+3. **Permutation null.** Default `--null freedman-lane`: within each unit, sentiment is
+   regressed on the model's controls (week-t perf and season-to-date std; common slopes, unit
+   intercepts), the residuals are permuted within unit and added back to the fitted values, so
+   fans' reaction to performance is kept and only the part of sentiment that could carry
+   information about next week is destroyed. `--null shuffle` is the original null (sentiment
+   itself shuffled within unit); it is biased when sentiment reacts to performance (null centered
+   off 0). Either way y_next, perf and std are fixed, the model is refit (light,
+   `store_units=False`), and the posterior mean of each `mu_k` collected. Two-sided
+   `perm_p = (1 + #{|null - c| >= |obs - c|}) / (1 + B)` with `c` = null median;
+   `perm_p_less` / `perm_p_greater` compare obs with the null as is. Seeded and independent of
+   worker count.
 4. **Multiple comparisons**, corrected within separate families (Benjamini-Hochberg `q_bh` and
    Holm `p_holm`, both hand-implemented; `--correction` picks which one the `*` marker in the
    printed table uses, default BH). Families: `metrics` (OPS, AVG, ERA, WHIP, FLD_PCT, ERRORS x
@@ -208,7 +213,7 @@ labeled 2026-04, so that month is longer than the rest. Monthly data gives ~5 po
   `pooled`). Units stay (fanbase, player), so a player discussed in two fanbases (own team sub
   and r/baseball) is two units that share the same outcome series; the pooled interval treats
   them as independent and is therefore somewhat too narrow. The permutation null is unaffected
-  (sentiment is shuffled within each unit, and under the null it carries no information).
+  (permutation is within each unit).
   Per-unit rows in `analysis_units.csv` keep their real fanbase.
 - `--alternative {two-sided,less,greater}` (default two-sided) picks which permutation p feeds
   `q_bh`/`p_holm` and the `*` marker. Every row carries `perm_p` (two-sided), `perm_p_less =
@@ -295,14 +300,17 @@ uv run fansent --data-dir <league data dir> confirm --workers 8
 
 It runs `FLD_Z` only, drops every player-week on the Red Sox (111) or Cubs (112) per
 `player_teams.csv`, excludes `news`, applies the own-team rule, pools all fanbase units into one
-group, and uses 4 chains x 6,000 iterations (burn 3,000), B = 1,000 within-unit permutations and
-the one-sided permutation p (`perm_p_less`). **CONFIRMED** iff the pooled `mu` is negative and
+group, and uses 4 chains x 6,000 iterations (burn 3,000), B = 1,000 within-unit shuffle permutations
+(the registered null; `correlate`'s default is now Freedman-Lane) and the one-sided permutation
+p (`perm_p_less`). **CONFIRMED** iff the pooled `mu` is negative and
 `perm_p_less < 0.05`; otherwise **NOT CONFIRMED**. The pooled `mu`, its 95% credible interval and
 the p-values are printed and written to `confirm_result.json` either way. If max R-hat is not
 below 1.05 the fit has not converged and the verdict is `INVALID (R-hat gate failed)`, flagged
 in the output and the JSON, instead of either outcome. Pooling treats a player who appears in
 two fanbases as two units (see `--pool-fanbases` above), so the interval is somewhat narrow;
-the registered decision uses the permutation p. Anything beyond this single test is exploratory.
+the registered decision uses the permutation p. `confirm` also prints and writes, labelled
+supplementary (post-hoc null fix, not part of the registered decision), the Freedman-Lane
+one-sided p and the null-centered two-sided p. Anything beyond this single test is exploratory.
 
 ## Results site
 
