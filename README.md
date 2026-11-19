@@ -165,6 +165,24 @@ Per metric (OPS, AVG, ERA, WHIP, FLD_PCT, ERRORS, CS_PCT, and a COMPOSITE index)
    `perm_p = (1 + #{|null - c| >= |obs - c|}) / (1 + B)` with `c` = null median;
    `perm_p_less` / `perm_p_greater` compare obs with the null as is. Seeded and independent of
    worker count.
+
+   **Within-player estimator (`--estimator mundlak`, opt-in, exploratory).** The default
+   `pooled` model multiplies *raw* sentiment by `gamma_unit` while the unit intercepts are
+   shrunk, so `mu_k` mixes the between-unit association (players who are discussed more
+   positively on average also do better on average) with the within-player effect, and the
+   pooled controls do not remove within-player mean reversion. `mundlak` splits sentiment,
+   perf and std into unit mean plus within-unit deviation (plain unweighted unit means),
+   applies `gamma_unit` / `mu_k` to the sentiment *deviation*, uses the perf / std deviations
+   as controls, and adds the three unit means as extra covariates with common fixed
+   coefficients (the Mundlak device). `mu_k` is then the within-player effect, in sd of next-week
+   performance per sd of *within-unit* sentiment; this is a different estimand and scale from
+   the pooled `mu_k` and the two are not comparable. The extra output column `beta_between` is
+   the standardized coefficient on the sentiment unit mean (sd of next-week performance per sd
+   of unit-mean sentiment, common to all fanbases of a metric). The model's precision weights
+   (next-week PA / IP) are unchanged and are not used in the unit means. The Freedman-Lane null
+   carries over unchanged: the sentiment deviation is regressed on the demeaned controls and
+   its residuals permuted within unit; unit means never move. `confirm` stays on the registered
+   `pooled` estimator, and any future confirmatory use of `mundlak` needs a new pre-registration.
 4. **Multiple comparisons**, corrected within separate families (Benjamini-Hochberg `q_bh` and
    Holm `p_holm`, both hand-implemented; `--correction` picks which one the `*` marker in the
    printed table uses, default BH). Families: `metrics` (OPS, AVG, ERA, WHIP, FLD_PCT, ERRORS x

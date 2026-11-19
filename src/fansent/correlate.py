@@ -65,7 +65,13 @@ FANBASE_COLS = [
     "n_obs",
     "rhat_max",
 ]
-OPTIONAL_COLS = ["null_mean", "supp_perm_p_less", "supp_perm_p", "supp_null_mean"]
+OPTIONAL_COLS = [
+    "null_mean",
+    "supp_perm_p_less",
+    "supp_perm_p",
+    "supp_null_mean",
+    "beta_between",
+]
 
 
 POOL_LEAGUE = "league"
@@ -273,8 +279,9 @@ def format_table(fb: pd.DataFrame, correction: str, alpha: float) -> str:
         t[c] = t[c].map("{:+.3f}".format)
     for c in ("p_pos", "perm_p", "perm_p_less", "perm_p_greater", "q_bh", "p_holm", "rhat_max"):
         t[c] = t[c].map("{:.3f}".format).replace("nan", "NA")
-    if "null_mean" in t:
-        t["null_mean"] = t["null_mean"].map("{:+.3f}".format)
+    for c in ("null_mean", "beta_between"):
+        if c in t:
+            t[c] = t[c].map("{:+.3f}".format)
     blocks = []
     for fam in FAMILY_ORDER:
         part = t[t["family"] == fam].drop(columns=["family", "exploratory"])

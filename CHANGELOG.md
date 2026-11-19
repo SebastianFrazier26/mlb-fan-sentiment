@@ -2,6 +2,16 @@
 
 ## 2026-11-18
 
+- `correlate --estimator {pooled,mundlak}` (`InferenceConfig.estimator`, default `pooled`, so
+  existing results and `confirm` reproduce exactly). `mundlak` is a within-player estimator:
+  sentiment, perf and std are split into unit mean plus within-unit deviation, `gamma_unit` /
+  `mu` apply to the sentiment deviation, perf / std deviations are the controls, and the three
+  unit means enter as extra covariates with fixed common coefficients. The estimand changes
+  (within-player effect, per sd of within-unit sentiment, not comparable to the pooled `mu`),
+  so any confirmatory use needs a new pre-registration; `confirm` has no such option.
+  `analysis_fanbases.csv` gains an optional `beta_between` column (coefficient on unit-mean
+  sentiment). The Freedman-Lane and shuffle nulls work with it unchanged. `hierarchical.fit`
+  takes optional `extra` covariates (own fixed coefficients; reported as `beta_<name>`).
 - Fix: the permutation null was biased when sentiment reacts to performance. Shuffling
   sentiment within unit is exchangeable only if sentiment is independent of week-t and
   season-to-date performance, which fans' reactions violate; the null for AVG/OPS/ERA/COMPOSITE

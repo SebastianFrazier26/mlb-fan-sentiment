@@ -12,6 +12,16 @@ Two nulls, picked by `InferenceConfig.null`:
   p-values are biased (2026-11-18 diagnosis: null mean ~+0.03 for AVG/OPS/ERA/COMPOSITE).
   Kept for reproducing the registered `confirm` statistic.
 
+Estimator (`InferenceConfig.estimator`): "pooled" (default, the registered one) regresses on raw
+sentiment, so mu mixes the between-unit association with the within-unit effect. "mundlak" splits
+sentiment, perf and std into unit mean + within-unit deviation, applies gamma_u / mu to the
+deviation and adds the three unit means as fixed-coefficient covariates; mu is then the
+within-player effect (sd of next outcome per sd of within-unit sentiment, a different estimand
+and scale), and beta_between is the standardized coefficient on the sentiment unit mean. Both
+nulls work unchanged: the model inputs are already deviations, so Freedman-Lane regresses the
+sentiment deviation on the demeaned controls and permutes within unit, and the unit means (the
+fixed `extras`) never move.
+
 The statistic is the posterior mean of mu_k from a light fit; the observed value uses the
 identical light settings (and its own seed slot) so the comparison is like for like.
 perm_p is two-sided and centered on the null median c:
@@ -34,7 +44,7 @@ import numpy as np
 import pandas as pd
 
 from . import hierarchical as h
-from .model_data import ModelInputs, panel_to_inputs
+from .model_data import ESTIMATORS, ModelInputs, panel_to_inputs
 from .panel import oriented
 
 
@@ -53,11 +63,18 @@ class InferenceConfig:
     pool_fanbases: bool = False
     # Which permutation p feeds the multiple-comparison correction and the table marker.
     alternative: str = "two-sided"
+    # "pooled" (registered) or "mundlak" (within-unit; see module docstring).
+    estimator: str = "pooled"
     # "freedman-lane" or "shuffle" (see module docstring).
     null: str = "freedman-lane"
     # Also compute this null and report its one-sided and centered p as supplementary columns.
     supplementary_null: str | None = None
     priors: h.Priors = field(default_factory=h.Priors)
+
+    def __post_init__(self) -> None:
+        # analyze() files per-metric ValueErrors under "skipped", which would hide a typo here.
+        if self.estimator not in ESTIMATORS:
+            raise ValueError(f"unknown estimator {self.estimator!r}; expected one of {ESTIMATORS}")
 
 
 @dataclass
@@ -110,6 +127,8 @@ def _light_mu(inp: ModelInputs, sent: np.ndarray, cfg: InferenceConfig, seed) ->
         seed=seed,
         priors=cfg.priors,
         store_units=False,
+        extra=inp.extras,
+        extra_names=list(inp.extra_names),
     )
     return res.pooled("mu").mean(axis=0)
 
@@ -182,6 +201,7 @@ def analyze_metric(panel: pd.DataFrame, metric: str, cfg: InferenceConfig) -> Me
         sent="sent",
         weight="weight" if use_w else None,
         pool=cfg.pool_fanbases,
+        estimator=cfg.estimator,
     )
     res = h.fit(
         inp.y_next,
@@ -209,7 +229,7 @@ def analyze_metric(panel: pd.DataFrame, metric: str, cfg: InferenceConfig) -> Me
     rhat_max = []
     for name in inp.fanbase_names:
         shared = diag["param"].isin(
-            [f"mu[{name}]", f"tau[{name}]", "sigma", "beta_perf", "beta_std"]
+            [f"mu[{name}]", f"tau[{name}]", "sigma", *(f"beta_{b}" for b in res.beta_names)]
         )
         rhat_max.append(diag.loc[shared, "rhat"].max())
     nobs = np.bincount(inp.fanbase_idx_of_unit[inp.unit_idx], minlength=len(inp.fanbase_names))
@@ -230,6 +250,8 @@ def analyze_metric(panel: pd.DataFrame, metric: str, cfg: InferenceConfig) -> Me
             "null_mean": null.mean(axis=0),
         }
     )
+    if "between" in res.beta_names:
+        fanbases["beta_between"] = res.pooled("beta")[:, res.beta_names.index("between")].mean()
     if supp is not None:
         fanbases["supp_perm_p_less"] = permutation_p_less(*supp)
         fanbases["supp_perm_p"] = permutation_p(*supp)

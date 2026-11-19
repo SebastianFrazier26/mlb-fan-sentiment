@@ -217,6 +217,15 @@ def main(argv: list[str] | None = None) -> None:
         "permutes sentiment itself (the original null, biased in that case)",
     )
     p.add_argument(
+        "--estimator",
+        choices=["pooled", "mundlak"],
+        default="pooled",
+        help="pooled: gamma_u multiplies raw sentiment (mu mixes between- and within-player "
+        "association; the registered estimator). mundlak: within-player effect, with unit "
+        "means of sentiment/perf/std as extra covariates (adds beta_between); a different "
+        "estimand, exploratory until pre-registered",
+    )
+    p.add_argument(
         "--pool-stats",
         choices=["league", "teams"],
         default="league",
@@ -478,6 +487,7 @@ def main(argv: list[str] | None = None) -> None:
                     pool_fanbases=args.pool_fanbases,
                     alternative=args.alternative,
                     null=args.null,
+                    estimator=args.estimator,
                 ),
                 args.metrics,
                 not args.no_composite,

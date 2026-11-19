@@ -58,10 +58,11 @@ class Priors:
 @dataclass
 class FitResult:
     """Posterior draws, each shaped (n_chains, n_draws, ...). mu/tau are per fanbase; beta is
-    (perf, std). alpha/gamma (per unit) are None when fit(store_units=False)."""
+    (perf, std, *extra covariates; see beta_names). alpha/gamma (per unit) are None when fit(store_units=False)."""
 
     draws: dict[str, np.ndarray]
     scales: dict[str, tuple[float, float]]  # name -> (mean, sd) used to z-score
+    beta_names: tuple[str, ...] = ("perf", "std")
     fanbase_names: list[str] | None = None
     unit_names: list[str] | None = None
     unit_fanbase: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=int))
@@ -88,8 +89,8 @@ class FitResult:
             out[f"mu[{label}]"] = d["mu"][:, :, k]
             out[f"tau[{label}]"] = d["tau"][:, :, k]
         out["sigma"] = d["sigma"]
-        out["beta_perf"] = d["beta"][:, :, 0]
-        out["beta_std"] = d["beta"][:, :, 1]
+        for i, name in enumerate(self.beta_names):
+            out[f"beta_{name}"] = d["beta"][:, :, i]
         return out
 
     def _fanbase_label(self, k: int) -> str:
@@ -240,6 +241,8 @@ def fit(
     seed: int | None = None,
     priors: Priors | None = None,
     store_units: bool = True,
+    extra=None,
+    extra_names: list[str] | None = None,
     fanbase_names: list[str] | None = None,
     unit_names: list[str] | None = None,
 ) -> FitResult:
@@ -252,6 +255,10 @@ def fit(
         weights: optional (N,) positive precision weights (e.g. PA / IP).
         n_iter: total iterations per chain including `burn`; kept draws = (n_iter-burn)//thin.
         store_units: keep per-unit alpha/gamma draws; disable for cheap repeated fits.
+        extra: optional (N, m) further control covariates with their own common (unit-invariant)
+            coefficients, appended to (perf, std) in beta; z-scored internally. The within-unit
+            estimator passes the unit means of sent, perf and std here.
+        extra_names: m names for those columns (default extra0, ...); reported as beta_<name>.
     """
     p = priors or Priors()
     y, perf, std, sent = (np.asarray(a, dtype=float) for a in (y_next, perf, std, sent))
@@ -264,6 +271,17 @@ def fit(
         raise ValueError("non-finite values in inputs")
     if unit_idx.dtype.kind not in "iu" or k_of_unit.dtype.kind not in "iu":
         raise ValueError("unit_idx and fanbase_idx_of_unit must be integer arrays")
+    if extra is None:
+        extra = np.empty((n, 0))
+    extra = np.asarray(extra, dtype=float)
+    if extra.ndim != 2 or extra.shape[0] != n or not np.isfinite(extra).all():
+        raise ValueError("extra must be a finite (N, m) array")
+    m_extra = extra.shape[1]
+    extra_names = (
+        list(extra_names) if extra_names is not None else [f"extra{i}" for i in range(m_extra)]
+    )
+    if len(extra_names) != m_extra:
+        raise ValueError("extra_names must have one name per extra column")
     n_units = k_of_unit.shape[0]
     if unit_idx.min() < 0 or unit_idx.max() >= n_units:
         raise ValueError("unit_idx out of range for fanbase_idx_of_unit")
@@ -289,17 +307,21 @@ def fit(
     perf, sp = _zscore(perf, "perf")
     std, ss_ = _zscore(std, "std")
     sent, sn = _zscore(sent, "sent")
+    extra_z = [_zscore(extra[:, i], extra_names[i]) for i in range(m_extra)]
+    extra = np.column_stack([e for e, _ in extra_z]) if m_extra else extra
 
     order = np.argsort(unit_idx, kind="stable")
-    y, perf, std, sent, w, u = (
+    y, perf, std, sent, w, u, extra = (
         y[order],
         perf[order],
         std[order],
         sent[order],
         w[order],
         unit_idx[order],
+        extra[order],
     )
-    X = np.column_stack([perf, std])
+    X = np.column_stack([perf, std, extra])
+    n_beta = X.shape[1]
     starts = np.concatenate([[0], np.cumsum(nobs)[:-1]])
     ws = w * sent
     sw = np.add.reduceat(w, starts)[None]
@@ -313,7 +335,7 @@ def fit(
     C = n_chains
     alpha = rng.normal(0, 0.5, (C, n_units))
     gamma = rng.normal(0, 0.5, (C, n_units))
-    beta = rng.normal(0, 0.5, (C, 2))
+    beta = rng.normal(0, 0.5, (C, n_beta))
     sigma2 = np.exp(rng.normal(0, 0.3, (C, 1)))
     mu_alpha = rng.normal(0, 0.5, (C, 1))
     mu = rng.normal(0, 0.5, (C, n_fb))
@@ -327,7 +349,7 @@ def fit(
         "mu": np.empty((C, n_keep, n_fb)),
         "tau": np.empty((C, n_keep, n_fb)),
         "sigma": np.empty((C, n_keep)),
-        "beta": np.empty((C, n_keep, 2)),
+        "beta": np.empty((C, n_keep, n_beta)),
         "mu_alpha": np.empty((C, n_keep)),
         "tau_alpha": np.empty((C, n_keep)),
     }
@@ -395,7 +417,9 @@ def fit(
 
     return FitResult(
         draws=out,
-        scales={"y_next": sy, "perf": sp, "std": ss_, "sent": sn},
+        scales={"y_next": sy, "perf": sp, "std": ss_, "sent": sn}
+        | {name: sc for name, (_, sc) in zip(extra_names, extra_z, strict=True)},
+        beta_names=("perf", "std", *extra_names),
         fanbase_names=fanbase_names,
         unit_names=unit_names,
         unit_fanbase=k_of_unit.copy(),
