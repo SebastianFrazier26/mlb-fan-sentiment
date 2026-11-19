@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-11-19
+
+- `docs/results-2026-11.md`: the pre-registered league fielding test came out not confirmed
+  (mu -0.0023, 95% CrI [-0.022, +0.017], one-sided p 0.183). It also covers the permutation-null
+  bias and that the decision survives the corrected null, the within-player re-estimate (the
+  demo's fielding cells no longer survive correction), and the exploratory league results (all
+  null).
+
 ## 2026-11-18
 
 - `correlate --estimator {pooled,mundlak}` (`InferenceConfig.estimator`, default `pooled`, so
