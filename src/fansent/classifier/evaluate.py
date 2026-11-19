@@ -213,7 +213,20 @@ def load_players(path: Path | None) -> list[dict]:
     import csv
 
     with open(path, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+        players = list(csv.DictReader(f))
+    # players.csv `team` is an abbreviation since weekly rosters; the relevance model compares
+    # full names, so resolve through the sibling teams.csv.
+    teams_path = path.with_name("teams.csv")
+    if teams_path.exists():
+        with open(teams_path, newline="", encoding="utf-8") as f:
+            rows = list(csv.DictReader(f))
+        by_id = {r["team_id"]: r["name"] for r in rows}
+        by_abbr = {r["team"]: r["name"] for r in rows}
+        for p in players:
+            name = by_id.get(p.get("team_id", "")) or by_abbr.get(p.get("team", ""))
+            if name:
+                p["team_name"] = name
+    return players
 
 
 def _prepare(

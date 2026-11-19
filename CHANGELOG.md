@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-11-18
+
+- Fix: relevance features `own_team_comment` / `own_team_parent` were always 0 since a29c147
+  (2026-11-16), when players.csv `team` became an abbreviation ("CHC") while the feature compares
+  against full names ("Chicago Cubs"). `load_players` now resolves the team through the sibling
+  `teams.csv` (`team_name`), and the relevance prep canonicalizes it, so abbreviation and
+  full-name forms both work. Relevance models trained or scored between a29c147 and this fix saw
+  these features at 0; retrain them (`clf-train --task relevance`). Still uses the current
+  players.csv team, not the per-week team (follow-up).
+
 ## 2026-11-17
 
 - `fansent confirm`: runs the pre-registered league-wide fielding test with the specification

@@ -31,7 +31,7 @@ from fansent.names import NAME_SUFFIXES, fold
 from . import softmax
 from .data import Example
 from .features import TfidfBlock, _ngrams
-from .teams import teams_in
+from .teams import canonical_team, teams_in
 from .text import Masker, tokenize
 
 REL_CLASSES = ("na", "relevant")
@@ -177,7 +177,7 @@ def relevance_prep(e: Example, masker: Masker, info: PlayerInfo) -> RelPrepped:
     flags["any_capitalized"] = float(cap_any)
     flags["all_lowercase"] = float(bool(matches) and not cap_any)
 
-    own_team = p.get("team", "")
+    own_team = canonical_team(p.get("team_name") or p.get("team", ""))
     comment_teams = teams_in(e.text)
     parent_teams = teams_in(e.parent_text) if e.parent_text else set()
     foreign_c = {t for t in comment_teams if t != own_team}

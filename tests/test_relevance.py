@@ -7,6 +7,7 @@ import pytest
 
 from fansent import sentiment, util
 from fansent.classifier import Example
+from fansent.classifier.evaluate import load_players
 from fansent.classifier.relevance import (
     DENSE_NAMES,
     RelConfig,
@@ -74,6 +75,37 @@ def test_team_terms_own_vs_foreign():
     assert f["own_team_parent"] == 1 and f["is_reply"] == 1
     f = feats("Diaz and the Cubs")
     assert f["own_team_comment"] == 1 and f["foreign_team_comment"] == 0
+
+
+def test_own_team_resolves_abbreviation_and_full_name(tmp_path):
+    (tmp_path / "teams.csv").write_text(
+        "team_id,team,name\n112,CHC,Chicago Cubs\n133,ATH,Athletics\n", encoding="utf-8"
+    )
+    (tmp_path / "players.csv").write_text(
+        "player_id,full_name,last_name,team,team_id\n"
+        "1,Edwin Diaz,Diaz,CHC,112\n3,Sam Athlete,Athlete,ATH,133\n",
+        encoding="utf-8",
+    )
+    for players in (
+        load_players(tmp_path / "players.csv"),
+        [
+            {
+                "player_id": "1",
+                "full_name": "Edwin Diaz",
+                "last_name": "Diaz",
+                "team": "Chicago Cubs",
+            }
+        ],
+    ):
+        clf = RelevanceClassifier(players)
+        e = Example("Diaz and the Cubs", "Edwin Diaz", "1", parent_text="cubs game")
+        d = dict(zip(DENSE_NAMES, relevance_prep(e, clf.masker, clf.info).dense, strict=False))
+        assert d["own_team_comment"] == 1 and d["own_team_parent"] == 1
+        assert d["foreign_team_comment"] == 0
+    clf = RelevanceClassifier(load_players(tmp_path / "players.csv"))
+    e = Example("Athlete and the Athletics", "Sam Athlete", "3")
+    d = dict(zip(DENSE_NAMES, relevance_prep(e, clf.masker, clf.info).dense, strict=False))
+    assert d["own_team_comment"] == 1
 
 
 def test_baseball_sub_duplicates_dense_block():
