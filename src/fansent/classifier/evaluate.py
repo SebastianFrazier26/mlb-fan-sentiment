@@ -9,6 +9,8 @@ from pathlib import Path
 import numpy as np
 from scipy.stats import spearmanr
 
+from fansent.util import PLAYER_TEAMS_FILE
+
 from .data import LABELS, Example, load_labeled
 from .embeddings import TokenVectors
 from .pipeline import CLASSES, ClfConfig, SentimentClassifier
@@ -207,13 +209,25 @@ def tune(
     return best[0], results
 
 
-def load_players(path: Path | None) -> list[dict]:
+class Roster(list):
+    """players.csv rows plus ``weekly``: (player_id, Monday ISO date) -> full team name from the
+    sibling player_teams.csv. A list subclass so every ``players: list[dict]`` signature keeps
+    working without threading a second argument through the train/eval stack."""
+
+    weekly: dict[tuple[str, str], str]
+
+    def __init__(self, rows=(), weekly=None) -> None:
+        super().__init__(rows)
+        self.weekly = weekly or {}
+
+
+def load_players(path: Path | None) -> Roster:
     if path is None or not path.exists():
-        return []
+        return Roster()
     import csv
 
     with open(path, newline="", encoding="utf-8") as f:
-        players = list(csv.DictReader(f))
+        players = Roster(csv.DictReader(f))
     # players.csv `team` is an abbreviation since weekly rosters; the relevance model compares
     # full names, so resolve through the sibling teams.csv.
     teams_path = path.with_name("teams.csv")
@@ -226,6 +240,14 @@ def load_players(path: Path | None) -> list[dict]:
             name = by_id.get(p.get("team_id", "")) or by_abbr.get(p.get("team", ""))
             if name:
                 p["team_name"] = name
+        weekly_path = path.with_name(PLAYER_TEAMS_FILE)
+        if weekly_path.exists():
+            with open(weekly_path, newline="", encoding="utf-8") as f:
+                players.weekly = {
+                    (r["player_id"], r["week_start"]): by_id[r["team_id"]]
+                    for r in csv.DictReader(f)
+                    if r["team_id"] in by_id
+                }
     return players
 
 

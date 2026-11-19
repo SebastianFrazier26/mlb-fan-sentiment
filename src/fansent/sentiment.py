@@ -79,6 +79,7 @@ def relevance_filter(
             player_id=str(t["player_id"]),
             parent_text=p,
             subreddit=t.get("subreddit") or "",
+            date=t.get("date") or "",
         )
         for t, p in zip(texts, parents, strict=True)
     ]

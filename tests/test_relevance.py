@@ -254,3 +254,47 @@ def test_no_relevance_flag_and_missing_model(data_dir):
 
 def test_masker_target_pattern_public():
     assert Masker(PLAYERS).target_pattern("Edwin Diaz", "1").search("saw Diaz")
+
+
+def _traded_roster(tmp_path):
+    (tmp_path / "teams.csv").write_text(
+        "team_id,team,name\n112,CHC,Chicago Cubs\n111,BOS,Boston Red Sox\n", encoding="utf-8"
+    )
+    # players.csv holds the current team (BOS); he was a Cub until the 2026-07-20 week.
+    (tmp_path / "players.csv").write_text(
+        "player_id,full_name,last_name,team,team_id\n1,Edwin Diaz,Diaz,BOS,111\n", encoding="utf-8"
+    )
+    (tmp_path / "player_teams.csv").write_text(
+        "player_id,team_id,week_start\n1,112,2026-07-13\n1,111,2026-07-20\n", encoding="utf-8"
+    )
+    return load_players(tmp_path / "players.csv")
+
+
+def _own(clf, **kw):
+    e = Example("Diaz and the Cubs", "Edwin Diaz", "1", **kw)
+    d = dict(zip(DENSE_NAMES, relevance_prep(e, clf.masker, clf.info).dense, strict=False))
+    return d["own_team_comment"], d["foreign_team_comment"]
+
+
+def test_own_team_uses_team_of_the_text_week(tmp_path):
+    clf = RelevanceClassifier(_traded_roster(tmp_path))
+    assert _own(clf, date="2026-07-19") == (1, 0)  # Sunday of the Cubs week
+    assert _own(clf, date="2026-07-20") == (0, 1)  # Monday of the Red Sox week
+
+
+def test_own_team_falls_back_to_roster_team(tmp_path):
+    clf = RelevanceClassifier(_traded_roster(tmp_path))
+    assert _own(clf, date="2026-03-01") == (0, 1)  # no player-week row
+    assert _own(clf) == (0, 1)  # no date
+    assert _own(clf, date="not a date") == (0, 1)
+
+
+def test_load_labeled_reads_date(tmp_path):
+    from fansent.classifier.data import load_labeled
+
+    f = tmp_path / "l.csv"
+    f.write_text(
+        "text,player,final_label,date\nhi,A B,pos,2026-07-19\nyo,A B,neg,\n", encoding="utf-8"
+    )
+    ex, _ = load_labeled([f])
+    assert [e.date for e in ex] == ["2026-07-19", ""]

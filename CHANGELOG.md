@@ -7,8 +7,13 @@
   against full names ("Chicago Cubs"). `load_players` now resolves the team through the sibling
   `teams.csv` (`team_name`), and the relevance prep canonicalizes it, so abbreviation and
   full-name forms both work. Relevance models trained or scored between a29c147 and this fix saw
-  these features at 0; retrain them (`clf-train --task relevance`). Still uses the current
-  players.csv team, not the per-week team (follow-up).
+  these features at 0; retrain them (`clf-train --task relevance`).
+- Relevance own-team features use the player's team in the Mon-Sun week of the text's date
+  (`player_teams.csv`, next to players.csv), not his current players.csv team, so traded players
+  are right before and after the deal. Falls back to the players.csv team when the date is
+  missing or the player-week has no row. `Example` gained an optional `date`; labeled CSVs'
+  `date` column and `score` texts' date feed it. Models trained before this change still load
+  and score, but were fit on current-team features: retrain for consistency.
 
 ## 2026-11-17
 

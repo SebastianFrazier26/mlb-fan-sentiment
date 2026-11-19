@@ -15,6 +15,7 @@ word TF-IDF + mention-context TF-IDF + dense flags.
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import math
 import re
@@ -27,6 +28,7 @@ from scipy import sparse
 from fansent.common_words import COMMON_WORDS
 from fansent.first_names import COMMON_FIRST_NAMES
 from fansent.names import NAME_SUFFIXES, fold
+from fansent.util import week_start
 
 from . import softmax
 from .data import Example
@@ -98,6 +100,7 @@ class PlayerInfo:
 
     def __init__(self, players: list[dict]) -> None:
         self.by_id = {str(p["player_id"]): p for p in players}
+        self.weekly: dict[tuple[str, str], str] = getattr(players, "weekly", {})
         self.by_name = {fold(p["full_name"]).lower(): p for p in players}
         self.first_names = set(COMMON_FIRST_NAMES)
         for p in players:
@@ -106,6 +109,19 @@ class PlayerInfo:
     @staticmethod
     def first_of(full_name: str) -> str:
         return fold(full_name).lower().split()[0] if full_name.split() else ""
+
+    def team_in_week(self, p: dict, day: str) -> str:
+        """Full team name of ``p`` in the Mon-Sun week of ``day`` (ISO date); the roster's
+        current team when the date is unusable or the player-week is absent."""
+        if day and self.weekly:
+            try:
+                week = week_start(dt.date.fromisoformat(day[:10])).isoformat()
+            except ValueError:
+                week = ""
+            team = self.weekly.get((str(p.get("player_id", "")), week))
+            if team:
+                return team
+        return p.get("team_name") or p.get("team", "")
 
     def lookup(self, e: Example) -> dict:
         return self.by_id.get(str(e.player_id)) or self.by_name.get(fold(e.player).lower()) or {}
@@ -177,7 +193,7 @@ def relevance_prep(e: Example, masker: Masker, info: PlayerInfo) -> RelPrepped:
     flags["any_capitalized"] = float(cap_any)
     flags["all_lowercase"] = float(bool(matches) and not cap_any)
 
-    own_team = canonical_team(p.get("team_name") or p.get("team", ""))
+    own_team = canonical_team(info.team_in_week(p, e.date))
     comment_teams = teams_in(e.text)
     parent_teams = teams_in(e.parent_text) if e.parent_text else set()
     foreign_c = {t for t in comment_teams if t != own_team}
