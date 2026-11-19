@@ -12,6 +12,7 @@ from fansent.classifier.relevance import (
     DENSE_NAMES,
     RelConfig,
     RelevanceClassifier,
+    load_weekly_roster,
     relevance_prep,
 )
 from fansent.classifier.relevance_eval import (
@@ -260,33 +261,71 @@ def _traded_roster(tmp_path):
     (tmp_path / "teams.csv").write_text(
         "team_id,team,name\n112,CHC,Chicago Cubs\n111,BOS,Boston Red Sox\n", encoding="utf-8"
     )
-    # players.csv holds the current team (BOS); he was a Cub until the 2026-07-20 week.
+    # players.csv holds the current team (BOS); he was a Cub through the 2026-07-13 week and
+    # on the Red Sox from the 2026-07-20 week, so 07-20 is the trade week.
     (tmp_path / "players.csv").write_text(
-        "player_id,full_name,last_name,team,team_id\n1,Edwin Diaz,Diaz,BOS,111\n", encoding="utf-8"
+        "player_id,full_name,last_name,team,team_id,subreddit\n1,Edwin Diaz,Diaz,BOS,111,redsox\n",
+        encoding="utf-8",
     )
     (tmp_path / "player_teams.csv").write_text(
-        "player_id,team_id,week_start\n1,112,2026-07-13\n1,111,2026-07-20\n", encoding="utf-8"
+        "player_id,team_id,week_start\n"
+        "1,112,2026-07-06\n1,112,2026-07-13\n1,111,2026-07-20\n1,111,2026-07-27\n",
+        encoding="utf-8",
     )
-    return load_players(tmp_path / "players.csv")
+    path = tmp_path / "players.csv"
+    return load_players(path), load_weekly_roster(path)
 
 
-def _own(clf, **kw):
-    e = Example("Diaz and the Cubs", "Edwin Diaz", "1", **kw)
-    d = dict(zip(DENSE_NAMES, relevance_prep(e, clf.masker, clf.info).dense, strict=False))
-    return d["own_team_comment"], d["foreign_team_comment"]
+def _feats(clf, text="Diaz and the Cubs", parent="", **kw):
+    e = Example(text, "Edwin Diaz", "1", parent_text=parent, **kw)
+    return dict(zip(DENSE_NAMES, relevance_prep(e, clf.masker, clf.info).dense, strict=False))
 
 
-def test_own_team_uses_team_of_the_text_week(tmp_path):
-    clf = RelevanceClassifier(_traded_roster(tmp_path))
-    assert _own(clf, date="2026-07-19") == (1, 0)  # Sunday of the Cubs week
-    assert _own(clf, date="2026-07-20") == (0, 1)  # Monday of the Red Sox week
+def _clf(tmp_path, weekly=True):
+    players, roster = _traded_roster(tmp_path)
+    return RelevanceClassifier(players, weekly_teams=roster if weekly else None)
+
+
+def test_own_team_is_the_week_team_outside_the_trade_week(tmp_path):
+    clf = _clf(tmp_path)
+    cubs = _feats(clf, parent="cubs game", date="2026-07-19")  # Sunday, Cubs week
+    assert (cubs["own_team_comment"], cubs["own_team_parent"]) == (1, 1)
+    assert (cubs["foreign_team_comment"], cubs["foreign_team_parent"]) == (0, 0)
+    sox = _feats(clf, parent="cubs game", date="2026-07-27")  # week after the move
+    assert (sox["own_team_comment"], sox["own_team_parent"]) == (0, 0)
+    assert (sox["foreign_team_comment"], sox["foreign_team_parent"]) == (1, 1)
+
+
+def test_trade_week_counts_both_teams(tmp_path):
+    clf = _clf(tmp_path)
+    d = _feats(clf, text="Diaz, Cubs and Red Sox", parent="cubs game", date="2026-07-20")
+    assert (d["own_team_comment"], d["own_team_parent"]) == (1, 1)
+    assert d["foreign_team_comment"] == 0 and d["foreign_team_parent"] == 0
+    assert _feats(clf, text="Diaz and the Red Sox", date="2026-07-22")["own_team_comment"] == 1
+
+
+def test_sub_own_follows_the_team_set(tmp_path):
+    clf = _clf(tmp_path)
+    assert _feats(clf, subreddit="CHICubs", date="2026-07-20")["sub_own"] == 1  # trade week
+    assert _feats(clf, subreddit="redsox", date="2026-07-20")["sub_own"] == 1
+    assert _feats(clf, subreddit="CHICubs", date="2026-07-27")["sub_own"] == 0
+    assert _feats(clf, subreddit="redsox", date="2026-07-27")["sub_own"] == 1
+    assert _feats(clf, subreddit="CHICubs", date="2026-07-13")["sub_own"] == 1
 
 
 def test_own_team_falls_back_to_roster_team(tmp_path):
-    clf = RelevanceClassifier(_traded_roster(tmp_path))
-    assert _own(clf, date="2026-03-01") == (0, 1)  # no player-week row
-    assert _own(clf) == (0, 1)  # no date
-    assert _own(clf, date="not a date") == (0, 1)
+    clf = _clf(tmp_path)
+    for kw in ({"date": "2026-03-01"}, {}, {"date": "not a date"}):  # no row / no date / junk
+        d = _feats(clf, **kw)
+        assert (d["own_team_comment"], d["foreign_team_comment"]) == (0, 1)
+    d = _feats(clf, subreddit="redsox")
+    assert d["sub_own"] == 1  # players.csv subreddit rule
+
+
+def test_without_weekly_teams_uses_roster_team(tmp_path):
+    clf = _clf(tmp_path, weekly=False)
+    d = _feats(clf, date="2026-07-19")
+    assert (d["own_team_comment"], d["foreign_team_comment"]) == (0, 1)
 
 
 def test_load_labeled_reads_date(tmp_path):

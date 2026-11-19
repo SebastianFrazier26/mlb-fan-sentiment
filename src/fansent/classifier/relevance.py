@@ -15,10 +15,12 @@ word TF-IDF + mention-context TF-IDF + dense flags.
 
 from __future__ import annotations
 
+import csv
 import datetime as dt
 import json
 import math
 import re
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -28,7 +30,8 @@ from scipy import sparse
 from fansent.common_words import COMMON_WORDS
 from fansent.first_names import COMMON_FIRST_NAMES
 from fansent.names import NAME_SUFFIXES, fold
-from fansent.util import week_start
+from fansent.panel import load_team_subreddit_rows
+from fansent.util import PLAYER_TEAMS_FILE, TEAMS_FILE, week_start
 
 from . import softmax
 from .data import Example
@@ -95,12 +98,52 @@ class RelPrepped:
     dense: np.ndarray
 
 
-class PlayerInfo:
-    """Roster lookups the features need: team, team subreddit, first name per player."""
+@dataclass(frozen=True)
+class WeeklyRoster:
+    """player_teams.csv in lookup form: (player_id, Monday ISO date) -> team_id, plus team_id ->
+    full name (teams.csv)."""
 
-    def __init__(self, players: list[dict]) -> None:
+    team_of: Mapping[tuple[str, str], int]
+    names: Mapping[int, str]
+
+
+def load_weekly_roster(players_path: Path | None) -> WeeklyRoster | None:
+    """Reads player_teams.csv and teams.csv beside players.csv; None if either is missing."""
+    if players_path is None:
+        return None
+    weekly_path = players_path.with_name(PLAYER_TEAMS_FILE)
+    teams_path = players_path.with_name(TEAMS_FILE)
+    if not (weekly_path.exists() and teams_path.exists()):
+        return None
+    with open(teams_path, newline="", encoding="utf-8") as f:
+        names = {int(r["team_id"]): r["name"] for r in csv.DictReader(f)}
+    with open(weekly_path, newline="", encoding="utf-8") as f:
+        team_of = {
+            (r["player_id"], r["week_start"]): int(r["team_id"])
+            for r in csv.DictReader(f)
+            if int(r["team_id"]) in names
+        }
+    return WeeklyRoster(team_of, names)
+
+
+def _team_subreddits() -> dict[int, frozenset[str]]:
+    out: dict[int, set[str]] = {}
+    for r in load_team_subreddit_rows():
+        out.setdefault(int(r["team_id"]), set()).add(r["subreddit"].lower())
+    return {k: frozenset(v) for k, v in out.items()}
+
+
+class PlayerInfo:
+    """Roster lookups the features need: team, team subreddit, first name per player.
+
+    With ``weekly``, own-team is the set of teams the player was on in the Mon-Sun week of the
+    text's date plus the previous week (a traded player counts for both teams in the week he
+    moved); without it, or when the player-week is absent, the players.csv team."""
+
+    def __init__(self, players: list[dict], weekly: WeeklyRoster | None = None) -> None:
         self.by_id = {str(p["player_id"]): p for p in players}
-        self.weekly: dict[tuple[str, str], str] = getattr(players, "weekly", {})
+        self.weekly = weekly
+        self.team_subs = _team_subreddits() if weekly else {}
         self.by_name = {fold(p["full_name"]).lower(): p for p in players}
         self.first_names = set(COMMON_FIRST_NAMES)
         for p in players:
@@ -110,18 +153,24 @@ class PlayerInfo:
     def first_of(full_name: str) -> str:
         return fold(full_name).lower().split()[0] if full_name.split() else ""
 
-    def team_in_week(self, p: dict, day: str) -> str:
-        """Full team name of ``p`` in the Mon-Sun week of ``day`` (ISO date); the roster's
-        current team when the date is unusable or the player-week is absent."""
+    def own_teams(self, p: dict, day: str) -> tuple[set[str], set[int] | None]:
+        """(full team names, team ids) the player counts for on ``day``; ids are None when the
+        players.csv fallback applies (date unusable, no weekly data, or no row for that week)."""
         if day and self.weekly:
             try:
-                week = week_start(dt.date.fromisoformat(day[:10])).isoformat()
+                week = week_start(dt.date.fromisoformat(day[:10]))
             except ValueError:
-                week = ""
-            team = self.weekly.get((str(p.get("player_id", "")), week))
-            if team:
-                return team
-        return p.get("team_name") or p.get("team", "")
+                week = None
+            pid = str(p.get("player_id", ""))
+            team_of = self.weekly.team_of
+            now = team_of.get((pid, week.isoformat())) if week else None
+            if now is not None:
+                ids = {now}
+                prev = team_of.get((pid, (week - dt.timedelta(days=7)).isoformat()))
+                if prev is not None:
+                    ids.add(prev)
+                return {self.weekly.names[i] for i in ids}, ids
+        return {p.get("team_name") or p.get("team", "")}, None
 
     def lookup(self, e: Example) -> dict:
         return self.by_id.get(str(e.player_id)) or self.by_name.get(fold(e.player).lower()) or {}
@@ -193,18 +242,24 @@ def relevance_prep(e: Example, masker: Masker, info: PlayerInfo) -> RelPrepped:
     flags["any_capitalized"] = float(cap_any)
     flags["all_lowercase"] = float(bool(matches) and not cap_any)
 
-    own_team = canonical_team(info.team_in_week(p, e.date))
+    own_names, own_ids = info.own_teams(p, e.date)
+    own_teams = {canonical_team(n) for n in own_names}
     comment_teams = teams_in(e.text)
     parent_teams = teams_in(e.parent_text) if e.parent_text else set()
-    foreign_c = {t for t in comment_teams if t != own_team}
-    flags["own_team_comment"] = float(own_team in comment_teams)
+    foreign_c = comment_teams - own_teams
+    flags["own_team_comment"] = float(bool(own_teams & comment_teams))
     flags["foreign_team_comment"] = float(bool(foreign_c))
-    flags["own_team_parent"] = float(own_team in parent_teams)
-    flags["foreign_team_parent"] = float(bool(parent_teams - {own_team}))
+    flags["own_team_parent"] = float(bool(own_teams & parent_teams))
+    flags["foreign_team_parent"] = float(bool(parent_teams - own_teams))
     flags["log_n_foreign_comment"] = math.log1p(len(foreign_c))
     flags["is_reply"] = float(bool(e.parent_text))
     flags["target_in_parent"] = float(parent_matches)
-    flags["sub_own"] = float(bool(e.subreddit) and e.subreddit == p.get("subreddit"))
+    if own_ids is None:
+        flags["sub_own"] = float(bool(e.subreddit) and e.subreddit == p.get("subreddit"))
+    else:
+        flags["sub_own"] = float(
+            any(e.subreddit.lower() in info.team_subs.get(i, ()) for i in own_ids)
+        )
     flags["log_len"] = math.log1p(len(text.split())) / 5.0
     flags["surname_is_first_name"] = float(last in info.first_names)
     flags["surname_is_common_word"] = float(last in COMMON_WORDS)
@@ -226,11 +281,12 @@ class RelevanceClassifier:
         self,
         players: list[dict] | None = None,
         config: RelConfig | None = None,
+        weekly_teams: WeeklyRoster | None = None,
     ) -> None:
         players = players or []
         self.config = config or RelConfig()
         self.masker = Masker(players)
-        self.info = PlayerInfo(players)
+        self.info = PlayerInfo(players, weekly_teams)
         self.word = TfidfBlock(self.config.min_df, 50000)
         self.ctx = TfidfBlock(self.config.min_df, 50000)
         self.w: np.ndarray | None = None
@@ -292,11 +348,16 @@ class RelevanceClassifier:
         )
 
     @classmethod
-    def load(cls, path: Path, players: list[dict] | None = None) -> RelevanceClassifier:
+    def load(
+        cls,
+        path: Path,
+        players: list[dict] | None = None,
+        weekly_teams: WeeklyRoster | None = None,
+    ) -> RelevanceClassifier:
         with np.load(path, allow_pickle=False) as z:
             if tuple(z["classes"].tolist()) != REL_CLASSES:
                 raise ValueError(f"{path} is not a relevance model")
-            model = cls(players, RelConfig.from_dict(json.loads(str(z["config"]))))
+            model = cls(players, RelConfig.from_dict(json.loads(str(z["config"]))), weekly_teams)
             model.w, model.b = z["w"], z["b"]
             for name in ("word", "ctx"):
                 blk = getattr(model, name)

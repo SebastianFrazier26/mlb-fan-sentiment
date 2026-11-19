@@ -10,7 +10,15 @@ import numpy as np
 
 from .data import Example, load_labeled
 from .evaluate import grouped_folds, load_players
-from .relevance import NA, REL, RelConfig, RelevanceClassifier, RelPrepped
+from .relevance import (
+    NA,
+    REL,
+    RelConfig,
+    RelevanceClassifier,
+    RelPrepped,
+    WeeklyRoster,
+    load_weekly_roster,
+)
 
 OPERATING_POINTS = ("f1", "precision")
 
@@ -89,12 +97,13 @@ def _oof_p_na(
     splits: list[np.ndarray],
     cfg: RelConfig,
     players: list[dict],
+    weekly: WeeklyRoster | None = None,
 ) -> np.ndarray:
     oof = np.zeros(len(y))
     for held in splits:
         mask = np.zeros(len(y), dtype=bool)
         mask[held] = True
-        model = RelevanceClassifier(players, cfg)
+        model = RelevanceClassifier(players, cfg, weekly)
         model.fit_prepped([d for d, m in zip(prepped, mask, strict=True) if not m], y[~mask])
         oof[mask] = model.p_na_prepped([d for d, m in zip(prepped, mask, strict=True) if m])
     return oof
@@ -107,18 +116,19 @@ def tune(
     folds: int = 5,
     seed: int = 0,
     log=print,
+    weekly: WeeklyRoster | None = None,
 ) -> tuple[RelConfig, np.ndarray]:
     """Grouped CV over the grid scored by mean average precision of na. Returns the best config
     and its out-of-fold P(na) (the threshold is chosen on these, never on held-out data)."""
     grid = grid or RelGrid()
-    prepped = RelevanceClassifier(players).prep(examples)
+    prepped = RelevanceClassifier(players, weekly_teams=weekly).prep(examples)
     is_na = y_na(examples)
     y = np.where(is_na, NA, REL)
     splits = grouped_folds(examples, folds, seed, _strata)
     best: tuple[float, RelConfig, np.ndarray] | None = None
     for c, dw, cw in itertools.product(grid.Cs, grid.dense_weights, grid.ctx_weights):
         cfg = replace(RelConfig(), C=c, dense_weight=dw, ctx_weight=cw)
-        oof = _oof_p_na(prepped, y, splits, cfg, players)
+        oof = _oof_p_na(prepped, y, splits, cfg, players, weekly)
         ap = average_precision(is_na, oof)
         log(f"cv C={c:g} dense={dw:g} ctx={cw:g}: AP(na) {ap:.3f}")
         if best is None or ap > best[0]:
@@ -157,9 +167,10 @@ def fit_with_threshold(
     seed: int,
     point: str,
     min_precision: float,
+    weekly: WeeklyRoster | None = None,
 ) -> RelevanceClassifier:
     """CV-tune, choose the threshold on out-of-fold scores, refit on all ``examples``."""
-    cfg, oof = tune(examples, players, grid, cv, seed)
+    cfg, oof = tune(examples, players, grid, cv, seed, weekly=weekly)
     is_na = y_na(examples)
     print(f"best: C={cfg.C:g} dense={cfg.dense_weight:g} ctx={cfg.ctx_weight:g}")
     print("\nout-of-fold precision-recall for na (training CV):")
@@ -170,7 +181,7 @@ def fit_with_threshold(
         print(f"  {name:<9} threshold {t:.3f}: precision {p:.3f} recall {r:.3f} F1 {f:.3f}")
     t = pick_threshold(is_na, oof, point, min_precision)
     print(f"operating point: {point} -> threshold {t:.3f}")
-    return RelevanceClassifier(players, replace(cfg, threshold=t)).fit(examples)
+    return RelevanceClassifier(players, replace(cfg, threshold=t), weekly).fit(examples)
 
 
 def run_eval(
@@ -190,7 +201,14 @@ def run_eval(
     fit_set, held = split_holdout(examples, holdout, seed)
     print(f"held out {len(held)} rows (grouped by text, stratified by subreddit x na)\n")
     model = fit_with_threshold(
-        fit_set, load_players(players_path), cv, grid, seed, point, min_precision
+        fit_set,
+        load_players(players_path),
+        cv,
+        grid,
+        seed,
+        point,
+        min_precision,
+        load_weekly_roster(players_path),
     )
     if held:
         print("\nheld-out Sonnet-labeled split:")
@@ -217,7 +235,14 @@ def run_train(
     examples, n_na = load_labeled(train, keep_na=True)
     print(f"relevance: {len(examples)} rows ({n_na} na)")
     model = fit_with_threshold(
-        examples, load_players(players_path), cv, grid, seed, point, min_precision
+        examples,
+        load_players(players_path),
+        cv,
+        grid,
+        seed,
+        point,
+        min_precision,
+        load_weekly_roster(players_path),
     )
     model.save(out)
     print(f"saved {out} (drop threshold P(na) >= {model.config.threshold:.3f})")
