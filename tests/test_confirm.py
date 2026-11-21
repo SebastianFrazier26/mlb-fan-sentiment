@@ -212,7 +212,8 @@ def test_one_sided_permutation_p_formula():
     np.testing.assert_allclose(permutation_p_less(obs, null), [3 / 5, 3 / 5, 4 / 5])
     np.testing.assert_allclose(permutation_p_greater(obs, null), [3 / 5, 4 / 5, 3 / 5])
     assert permutation_p_less(obs, null).min() >= 1 / 5
-    np.testing.assert_allclose(permutation_p(obs, null)[0], 3 / 5)
+    # two-sided is centered on the null median (-0.25 here), not on 0
+    np.testing.assert_allclose(permutation_p(obs, null)[0], 1.0)
 
 
 def test_alternative_selects_correction_column():
@@ -273,7 +274,8 @@ def _fake_analyze(captured, mu, p, rhat):
             {
                 "metric": ["FLD_Z"], "fanbase": ["pooled"], "mu_mean": [mu], "ci_low": [mu - 0.1],
                 "ci_high": [mu + 0.1], "perm_p": [2 * p], "perm_p_less": [p], "n_units": [40],
-                "n_obs": [900], "rhat_max": [rhat],
+                "n_obs": [900], "rhat_max": [rhat], "null_mean": [0.03],
+                "supp_perm_p_less": [0.4], "supp_perm_p": [0.7], "supp_null_mean": [0.0],
             }
         )  # fmt: skip
         return correlate.Outputs(fb, fb, fb.iloc[0:0], fb.iloc[0:0], [], {}, 0.0)
@@ -310,6 +312,7 @@ def test_confirm_run_hardcodes_spec_and_writes_result(monkeypatch, tmp_path, mu,
     icfg = got["icfg"]
     assert (icfg.n_chains, icfg.n_iter, icfg.burn, icfg.perm_b) == (4, 6000, 3000, 1000)
     assert icfg.pool_fanbases and icfg.alternative == "less" and icfg.workers == 3
+    assert icfg.null == "shuffle" and icfg.supplementary_null == "freedman-lane"
     assert got["metrics"] == ["FLD_Z"] and got["composite"] is False and got["oaa"] is None
     assert got["scope"].exclude_teams == frozenset({111, 112})
     assert got["scope"].exclude_fanbases == frozenset({"news"})
@@ -318,6 +321,9 @@ def test_confirm_run_hardcodes_spec_and_writes_result(monkeypatch, tmp_path, mu,
     assert v.decision.startswith(expected) and res["decision"] == v.decision
     assert res["perm_p_less"] == p and res["mu_mean"] == mu and res["seed"] == 7
     assert res["preregistration"] == "docs/preregistration.md"
+    assert res["null"] == "shuffle"
+    supp = res["supplementary_post_hoc_null_fix"]
+    assert supp["perm_p_less"] == 0.4 and supp["perm_p_two_sided_centered"] == 0.7
 
 
 def test_confirm_requires_weekly_rosters(monkeypatch, tmp_path):
