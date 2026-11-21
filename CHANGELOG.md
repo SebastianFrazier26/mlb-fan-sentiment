@@ -1,7 +1,45 @@
 # Changelog
 
+## 2026-11-19
+
+- `docs/results-2026-11.md`: the pre-registered league fielding test came out not confirmed
+  (mu -0.0023, 95% CrI [-0.022, +0.017], one-sided p 0.183). It also covers the permutation-null
+  bias and that the decision survives the corrected null, the within-player re-estimate (the
+  demo's fielding cells no longer survive correction), and the exploratory league results (all
+  null).
+
 ## 2026-11-18
 
+- `correlate --estimator {pooled,mundlak}` (`InferenceConfig.estimator`, default `pooled`, so
+  existing results and `confirm` reproduce exactly). `mundlak` is a within-player estimator:
+  sentiment, perf and std are split into unit mean plus within-unit deviation, `gamma_unit` /
+  `mu` apply to the sentiment deviation, perf / std deviations are the controls, and the three
+  unit means enter as extra covariates with fixed common coefficients. The estimand changes
+  (within-player effect, per sd of within-unit sentiment, not comparable to the pooled `mu`),
+  so any confirmatory use needs a new pre-registration; `confirm` has no such option.
+  `analysis_fanbases.csv` gains an optional `beta_between` column (coefficient on unit-mean
+  sentiment). The Freedman-Lane and shuffle nulls work with it unchanged. `hierarchical.fit`
+  takes optional `extra` covariates (own fixed coefficients; reported as `beta_<name>`).
+- Fix: the permutation null was biased when sentiment reacts to performance. Shuffling
+  sentiment within unit is exchangeable only if sentiment is independent of week-t and
+  season-to-date performance, which fans' reactions violate; the null for AVG/OPS/ERA/COMPOSITE
+  was centered about +0.03 (about 3 null sd) while the observed pooled effect was about 0, so
+  small `perm_p_less` values (e.g. 0.001) were an artifact. A synthetic panel where sentiment
+  only reacts to past performance (no effect on outcome) rejected 10/10.
+- `correlate` now defaults to a Freedman-Lane residual permutation null: within each unit,
+  sentiment is regressed on the model's controls (perf, std; common slopes, unit intercepts),
+  the residuals are permuted within unit and added back to the fitted values. `--null
+  {freedman-lane,shuffle}` selects it (`InferenceConfig.null`); `shuffle` is the old null.
+- Two-sided `perm_p` is now centered on the null median:
+  `(1 + #{|null - c| >= |obs - c|}) / (1 + B)`, `c = median(null)`, for both nulls (it assumed
+  a null symmetric about 0 before). `perm_p_less` / `perm_p_greater` are unchanged: they
+  compare obs with the null's own distribution. `analysis_fanbases.csv` gains an optional
+  `null_mean` column. `fansent power --perm-b` uses the new default null.
+- `fansent confirm` still decides on the registered statistic (shuffle null, uncentered
+  one-sided `perm_p_less`; decision logic untouched). The Freedman-Lane one-sided p, the centered
+  two-sided p and both null means are added to the printout and `confirm_result.json` as
+  supplementary post-hoc fields, not part of the registered decision. `perm_p_two_sided` there
+  is now the centered p.
 - Fix: relevance features `own_team_comment` / `own_team_parent` were always 0 since a29c147
   (2026-11-16), when players.csv `team` became an abbreviation ("CHC") while the feature compares
   against full names ("Chicago Cubs"). `load_players` now resolves the team through the sibling

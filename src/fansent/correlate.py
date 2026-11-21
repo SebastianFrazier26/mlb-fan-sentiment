@@ -65,6 +65,13 @@ FANBASE_COLS = [
     "n_obs",
     "rhat_max",
 ]
+OPTIONAL_COLS = [
+    "null_mean",
+    "supp_perm_p_less",
+    "supp_perm_p",
+    "supp_null_mean",
+    "beta_between",
+]
 
 
 POOL_LEAGUE = "league"
@@ -249,9 +256,8 @@ def analyze(
         raise SystemExit(
             "No (metric, fanbase) had enough data; lower --min-weeks/--min-mentions or collect more."
         )
-    fb = correct(pd.concat([r.fanbases for r in results], ignore_index=True), icfg.alternative)[
-        FANBASE_COLS
-    ]
+    fb = correct(pd.concat([r.fanbases for r in results], ignore_index=True), icfg.alternative)
+    fb = fb[FANBASE_COLS + [c for c in OPTIONAL_COLS if c in fb.columns]]
     units = pd.concat([r.units for r in results], ignore_index=True)
     is_oaa = fb["metric"] == "OAA"
     return Outputs(
@@ -273,6 +279,9 @@ def format_table(fb: pd.DataFrame, correction: str, alpha: float) -> str:
         t[c] = t[c].map("{:+.3f}".format)
     for c in ("p_pos", "perm_p", "perm_p_less", "perm_p_greater", "q_bh", "p_holm", "rhat_max"):
         t[c] = t[c].map("{:.3f}".format).replace("nan", "NA")
+    for c in ("null_mean", "beta_between"):
+        if c in t:
+            t[c] = t[c].map("{:+.3f}".format)
     blocks = []
     for fam in FAMILY_ORDER:
         part = t[t["family"] == fam].drop(columns=["family", "exploratory"])

@@ -71,6 +71,8 @@ def run(data_dir: Path, workers: int = 1, seed: int = 0) -> Verdict:
         perm_b=1000,
         pool_fanbases=True,
         alternative="less",
+        null="shuffle",  # the registered null; do not follow the correlate default
+        supplementary_null="freedman-lane",
         workers=workers,
         seed=seed,
     )
@@ -100,11 +102,20 @@ def report(v: Verdict, row: pd.Series, icfg: InferenceConfig, data_dir: Path) ->
     print("\n=== Confirmatory test (docs/preregistration.md): pooled FLD_Z effect ===")
     print(f"pooled mu     {v.mu_mean:+.4f} sd(next-week FLD_Z) per sd(sentiment)")
     print(f"95% CrI       [{v.ci_low:+.4f}, {v.ci_high:+.4f}]")
-    print(f"one-sided p   {v.perm_p_less:.4f}  (H1: mu < 0; two-sided {row.perm_p:.4f}, B=1000)")
+    print(
+        f"one-sided p   {v.perm_p_less:.4f}  (shuffle null; H1: mu < 0; "
+        f"two-sided null-centered {row.perm_p:.4f}, B=1000)"
+    )
     print(f"units / obs   {int(row.n_units)} / {int(row.n_obs)}")
     flag = "" if v.rhat_ok else f"   ** FAILS the R-hat < {RHAT_MAX} requirement **"
     print(f"max R-hat     {v.rhat_max:.4f}{flag}")
-    print(f"\nDECISION: {v.decision}")
+    print(f"\nDECISION: {v.decision}  (registered shuffle-null one-sided p)")
+    print("\nsupplementary (post-hoc null fix, not part of the registered decision):")
+    print(
+        f"  Freedman-Lane one-sided p {row.supp_perm_p_less:.4f}, "
+        f"two-sided null-centered p {row.supp_perm_p:.4f}"
+    )
+    print(f"  null means: shuffle {row.null_mean:+.4f}, Freedman-Lane {row.supp_null_mean:+.4f}")
     result = {
         "preregistration": "docs/preregistration.md",
         "run_at_utc": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
@@ -121,6 +132,15 @@ def report(v: Verdict, row: pd.Series, icfg: InferenceConfig, data_dir: Path) ->
         "n_units": int(row.n_units),
         "n_obs": int(row.n_obs),
         "perm_p_two_sided": float(row.perm_p),
+        "null": "shuffle",
+        "null_mean": float(row.null_mean),
+        "supplementary_post_hoc_null_fix": {
+            "note": "Freedman-Lane null added 2026-11-18; not part of the registered decision",
+            "null": "freedman-lane",
+            "perm_p_less": float(row.supp_perm_p_less),
+            "perm_p_two_sided_centered": float(row.supp_perm_p),
+            "null_mean": float(row.supp_null_mean),
+        },
         **asdict(v),
     }
     path = data_dir / RESULT_FILE
