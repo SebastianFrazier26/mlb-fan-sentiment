@@ -40,6 +40,23 @@
   two-sided p and both null means are added to the printout and `confirm_result.json` as
   supplementary post-hoc fields, not part of the registered decision. `perm_p_two_sided` there
   is now the centered p.
+- Fix: relevance features `own_team_comment` / `own_team_parent` were always 0 since a29c147
+  (2026-11-16), when players.csv `team` became an abbreviation ("CHC") while the feature compares
+  against full names ("Chicago Cubs"). `load_players` now resolves the team through the sibling
+  `teams.csv` (`team_name`), and the relevance prep canonicalizes it, so abbreviation and
+  full-name forms both work. Relevance models trained or scored between a29c147 and this fix saw
+  these features at 0; retrain them (`clf-train --task relevance`).
+- Relevance own-team features use the player's team in the Mon-Sun week of the text's date
+  (`player_teams.csv`, next to players.csv), not his current players.csv team, so traded players
+  are right before and after the deal. In the week he moved he counts for both the new and the
+  previous week's team: `own_team_comment`, `own_team_parent` and `sub_own` (subreddit of any
+  team in the set, via `team_subreddits.csv`) accept either, and the foreign-team features
+  exclude both. Falls back to the players.csv team (and its `subreddit`) when the date is
+  missing or the player-week has no row. The weekly map is an explicit `weekly_teams` argument
+  (`load_weekly_roster(players_path)`) on `RelevanceClassifier` / `load` / `relevance_filter`;
+  `None` keeps the current-team behaviour. `Example` gained an optional `date`; labeled CSVs'
+  `date` column and `score` texts' date feed it. Models trained before this change still load
+  and score, but were fit on current-team features: retrain for consistency.
 
 ## 2026-11-17
 

@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .classifier.data import Example
 from .classifier.evaluate import load_players
+from .classifier.relevance import WeeklyRoster, load_weekly_roster
 from .classifier.scorers import build_scorer
 from .util import (
     DEFAULT_DATA_DIR,
@@ -65,12 +66,16 @@ def parent_texts_for(texts: list[dict], data_dir: Path) -> tuple[list[str], int]
 
 
 def relevance_filter(
-    texts: list[dict], model_path: Path, players: list[dict], data_dir: Path
+    texts: list[dict],
+    model_path: Path,
+    players: list[dict],
+    data_dir: Path,
+    weekly_teams: WeeklyRoster | None = None,
 ) -> list[dict]:
     """Drop rows the relevance model calls 'na'; write the audit sidecar; return kept rows."""
     from .classifier.relevance import RelevanceClassifier
 
-    model = RelevanceClassifier.load(model_path, players)
+    model = RelevanceClassifier.load(model_path, players, weekly_teams)
     parents, _ = parent_texts_for(texts, data_dir)
     examples = [
         Example(
@@ -79,6 +84,7 @@ def relevance_filter(
             player_id=str(t["player_id"]),
             parent_text=p,
             subreddit=t.get("subreddit") or "",
+            date=t.get("date") or "",
         )
         for t, p in zip(texts, parents, strict=True)
     ]
@@ -132,7 +138,13 @@ def run(
         relevance_model = data_dir / MODELS_DIR / RELEVANCE_MODEL_FILE
         use_relevance = use_relevance and relevance_model.exists()
     if use_relevance:
-        texts = relevance_filter(texts, relevance_model, players, data_dir)
+        texts = relevance_filter(
+            texts,
+            relevance_model,
+            players,
+            data_dir,
+            load_weekly_roster(data_dir / PLAYERS_FILE),
+        )
     if scorer == "clf" and model is None:
         model = data_dir / MODELS_DIR / MODEL_FILE
     s = build_scorer(scorer, model, players)

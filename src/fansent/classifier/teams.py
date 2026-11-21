@@ -59,3 +59,17 @@ def teams_in(text: str) -> set[str]:
     """Canonical names of the teams mentioned in ``text``."""
     t = _prep_text(text)
     return {team for team, pat in _PATTERNS.items() if pat.search(t)}
+
+
+def canonical_team(value: str) -> str:
+    """Map a team full name (exact or a suffix like 'Athletics') to its ``TEAM_TERMS`` key.
+
+    Unknown values come back unchanged, so an abbreviation never matches a mention.
+    """
+    value = value.strip()
+    if value in TEAM_TERMS:
+        return value
+    for team in TEAM_TERMS:
+        if value and team.endswith(" " + value):
+            return team
+    return value

@@ -1,5 +1,6 @@
 """Labeled-example loading. Label files are CSVs: text, player, player_id, final_label |
-draft_label, optional aliases (';'-separated), optional parent_text (reply context). Other columns are ignored."""
+draft_label, optional aliases (';'-separated), optional parent_text (reply context), optional date (ISO; selects the player's team that
+week). Other columns are ignored."""
 
 from __future__ import annotations
 
@@ -34,6 +35,7 @@ class Example:
     label: str | None = None
     parent_text: str = ""
     subreddit: str = ""
+    date: str = ""  # ISO yyyy-mm-dd; "" = unknown
 
 
 def normalize_label(raw: str) -> str:
@@ -74,6 +76,7 @@ def load_labeled(paths: list[Path], keep_na: bool = False) -> tuple[list[Example
                         label=label,
                         parent_text=(row.get("parent_text") or "").strip(),
                         subreddit=(row.get("subreddit") or "").strip(),
+                        date=(row.get("date") or "").strip()[:10],
                     )
                 )
     return out, n_na
