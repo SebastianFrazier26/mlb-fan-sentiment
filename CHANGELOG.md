@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-11-21
+
+- `docs/results-2026-11.md` corrected. The demo's within-player rows had been fitted on an older,
+  smaller dataset. On the corrected demo data the fielding cells are borderline (within-player q
+  about 0.05, pooled 0.07 to 0.09), not gone, so the conclusion now calls the demo signal
+  unconfirmed and specific to the Cubs and Red Sox, not faded. The exploratory numbers are
+  updated after re-scoring with the weekly-team relevance filter (league drop rate 5.0% to 5.3%,
+  demo 16.8% to 14.6%). Also fixed: 218 per-fanbase cells, not about 250, and the ERA fits are
+  flagged as unconverged (R-hat 1.064).
+
 ## 2026-11-19
 
 - `docs/results-2026-11.md`: the pre-registered league fielding test came out not confirmed
