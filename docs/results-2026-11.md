@@ -61,8 +61,10 @@ with the fixed relevance filter (see the end of this note); the numbers are from
 **Whole league, pooled, Cubs and Red Sox players excluded.** Nothing is significant under either
 estimator. The smallest q is 0.14 to 0.15. OPS and AVG lean slightly negative (within-player mu
 -0.018 and -0.016, one-sided p about 0.04, q 0.27), which does not survive correction across the
-family. The ERA fits did not converge (R-hat 1.064, above the 1.05 limit), so the ERA rows are not
-usable. `FLD_Z`, re-checked on the new scores as a sensitivity check only, is mu +0.0014, 95% CrI
+family. The pooled-estimator ERA fit did not converge at the default chain length (R-hat 1.064,
+above the 1.05 limit; the within-player ERA fit was fine at 1.001). Re-run on 2026-11-22 with
+chains four times longer (4 x 24000, burn 12000), every pooled fit converges (max R-hat 1.003)
+and ERA is unchanged: mu -0.006, 95% CrI [-0.034, +0.022], q 0.58. `FLD_Z`, re-checked on the new scores as a sensitivity check only, is mu +0.0014, 95% CrI
 [-0.018, +0.021].
 
 **Per fanbase, whole league.** No cell has q < 0.10, out of 218. The smallest q is 0.42. Effects

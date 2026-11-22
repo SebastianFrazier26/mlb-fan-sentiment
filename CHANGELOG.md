@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-22
+
+- `docs/results-2026-11.md`: the unconverged ERA fit was the pooled-estimator one only. Re-run
+  with longer chains (4 x 24000) it converges (R-hat 1.001) with the same null estimate.
+- README: fixed the broken indentation in item 6 (OAA check) of the method list.
+
 ## 2026-11-21
 
 - `docs/results-2026-11.md` corrected. The demo's within-player rows had been fitted on an older,
