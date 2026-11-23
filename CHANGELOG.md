@@ -5,6 +5,10 @@
 - `docs/results-2026-11.md`: the unconverged ERA fit was the pooled-estimator one only. Re-run
   with longer chains (4 x 24000) it converges (R-hat 1.001) with the same null estimate.
 - README: fixed the broken indentation in item 6 (OAA check) of the method list.
+- `correlate` writes a new optional column `mu_minus_null` (`mu_mean - null_mean`). The pooled
+  mu must be read against the center of its permutation null, which is off zero where sentiment
+  varies mostly between players (league OAA: +0.028). README method section and
+  `docs/results-2026-11.md` explain how to read it. `confirm` is unchanged.
 
 ## 2026-11-21
 

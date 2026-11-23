@@ -64,8 +64,37 @@ estimator. The smallest q is 0.14 to 0.15. OPS and AVG lean slightly negative (w
 family. The pooled-estimator ERA fit did not converge at the default chain length (R-hat 1.064,
 above the 1.05 limit; the within-player ERA fit was fine at 1.001). Re-run on 2026-11-22 with
 chains four times longer (4 x 24000, burn 12000), every pooled fit converges (max R-hat 1.003)
-and ERA is unchanged: mu -0.006, 95% CrI [-0.034, +0.022], q 0.58. `FLD_Z`, re-checked on the new scores as a sensitivity check only, is mu +0.0014, 95% CrI
-[-0.018, +0.021].
+and ERA is unchanged: mu -0.006, 95% CrI [-0.034, +0.022], q 0.58. `FLD_Z`, re-checked on the
+new scores as a sensitivity check only, is mu +0.0014, 95% CrI [-0.018, +0.021].
+
+**How to read the pooled mu (added 2026-11-22).** The pooled mu should be compared with the
+center of its permutation null, not with zero. The Freedman-Lane null keeps each player's
+average sentiment, and the pooled estimator lets some of the between-player association into
+mu, so the null sits where that association puts it. For most weekly metrics the center is
+small (+0.001 to +0.008). For OAA it is +0.028, because OAA is monthly (about 4 points per
+player) and 58% of its sentiment variance is between players, against 27% for OPS. A check
+that reassigned each player's average sentiment to a random player moved the OAA null by
+-0.035 and the OPS null by -0.028, and the within-player estimator's nulls are centered on
+zero (OAA +0.00003). The p-values compare mu with the null as it is, so they are unaffected.
+
+`correlate` now writes `mu_minus_null` (mu minus the null center) next to `null_mean`. On the
+league pooled run it agrees with the within-player estimates:
+
+| Metric | Pooled mu | Null center | mu minus null | Within-player mu |
+|---|---|---|---|---|
+| OPS | -0.010 | +0.008 | -0.018 | -0.018 |
+| AVG | -0.009 | +0.007 | -0.016 | -0.016 |
+| ERA | -0.006 | +0.004 | -0.010 | -0.009 |
+| WHIP | -0.008 | +0.005 | -0.013 | -0.012 |
+| ERRORS | +0.002 | +0.001 | +0.001 | +0.002 |
+| FLD_PCT | +0.001 | +0.003 | -0.003 | -0.002 |
+| COMPOSITE | -0.005 | +0.006 | -0.011 | -0.012 |
+| OAA | +0.015 | +0.028 | -0.013 | -0.018 |
+
+So the pooled OAA estimate of +0.015 is not a small positive effect: it sits below its null
+center, and OAA is null under both estimators (pooled q 0.33, within-player q 0.31). None of
+this changes a conclusion. `mu_minus_null` has no interval of its own and is not used by the
+registered test.
 
 **Per fanbase, whole league.** No cell has q < 0.10, out of 218. The smallest q is 0.42. Effects
 point both ways.

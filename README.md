@@ -166,6 +166,18 @@ Per metric (OPS, AVG, ERA, WHIP, FLD_PCT, ERRORS, CS_PCT, and a COMPOSITE index)
    `perm_p_less` / `perm_p_greater` compare obs with the null as is. Seeded and independent of
    worker count.
 
+   **Reading the pooled `mu_k` (2026-11-22).** Do not read the pooled `mu_mean` against zero.
+   The Freedman-Lane null keeps each unit's mean sentiment and the part of sentiment explained
+   by the controls, and the pooled model's `mu_k` absorbs some of both, so the null is centered
+   on that share, not on 0. Output column `null_mean` is that center and `mu_minus_null` =
+   `mu_mean - null_mean` is what is left for the within-player, beyond-controls part. The offset
+   is largest where most of the sentiment variance is between players: league OAA (monthly,
+   about 4 points per player) has `null_mean` +0.028, against +0.008 or less for the weekly
+   metrics. The p-values already compare `mu` with the null's own distribution and need no
+   adjustment. `mu_minus_null` is a reading aid on the pooled scale, not a separate estimator:
+   it has no interval of its own, and nothing is decided on it (`confirm` does not use it).
+   For a within-player estimate with an interval, use `--estimator mundlak`.
+
    **Within-player estimator (`--estimator mundlak`, opt-in, exploratory).** The default
    `pooled` model multiplies *raw* sentiment by `gamma_unit` while the unit intercepts are
    shrunk, so `mu_k` mixes the between-unit association (players who are discussed more

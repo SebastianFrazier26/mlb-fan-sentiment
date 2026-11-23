@@ -30,6 +30,13 @@ symmetric about 0, which neither null guarantees. perm_p_less / perm_p_greater a
 one-sided (1 + #{null <= obs}) / (1 + B) and its mirror; they compare obs with the null's own
 distribution, so a shifted null is already accounted for and no centering applies.
 
+mu_minus_null = mu_mean - null_mean. The Freedman-Lane null keeps each unit's mean sentiment and
+the part of sentiment explained by the controls, and the pooled estimator's mu absorbs some of
+both (unit intercepts are shrunk), so the null is centered on that share rather than on 0
+(2026-11-22 diagnosis: +0.028 for league OAA, where 58% of sentiment variance is between
+units). mu_minus_null is what is left for the within-unit, beyond-controls part; it is a reading
+aid for the pooled mu, not a separate estimator, and no p-value or decision uses it.
+
 Seeds: one SeedSequence child per replicate (slot 0 = observed), so results do not depend on
 worker count.
 """
@@ -248,6 +255,7 @@ def analyze_metric(panel: pd.DataFrame, metric: str, cfg: InferenceConfig) -> Me
             "n_obs": nobs,
             "rhat_max": rhat_max,
             "null_mean": null.mean(axis=0),
+            "mu_minus_null": fb["mu_mean"].to_numpy() - null.mean(axis=0),
         }
     )
     if "between" in res.beta_names:
