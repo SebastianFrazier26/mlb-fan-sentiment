@@ -54,7 +54,8 @@ def test_committed_snapshots_are_valid_and_aggregate_only():
     paths = sorted(PUBLISHED.glob("*.json"))
     assert paths
     allowed = set(site.KNOWN_METRICS) | set(site.KNOWN_FAMILIES) | site.TOP_KEYS | site.ROW_KEYS
-    allowed |= {"bh", "holm", *site.STATUSES}
+    allowed |= {"bh", "holm", *site.STATUSES, *site.NULLS, *site.SCOPES, site.CONFIRM_METRIC}
+    allowed |= site.TOP_KEYS_V2 | site.SECTION_KEYS | site.CONFIRM_KEYS
     for path in paths:
         snap = site.load_snapshot(path)
         assert path.stem == snap["run_id"]
@@ -172,3 +173,116 @@ def test_latest_snapshot_picks_newest_run(snap, tmp_path):
     for rid in ("2026-09-01-a", "2026-10-13-b"):
         site.write_snapshot({**snap, "run_id": rid}, tmp_path)
     assert site.latest_snapshot(tmp_path).name == "2026-10-13-b.json"
+
+
+def _confirm_json(tmp_path, **over):
+    c = {
+        "preregistration": "docs/preregistration.md",
+        "metric": "FLD_Z",
+        "decision": "NOT CONFIRMED",
+        "mu_mean": -0.0023,
+        "ci_low": -0.022,
+        "ci_high": 0.017,
+        "perm_p_less": 183 / 1001,
+        "rhat_max": 1.005,
+        "n_units": 651,
+        "n_obs": 11818,
+        "excluded_fanbases": ["news"],
+        **over,
+    }
+    path = tmp_path / "confirm_result.json"
+    path.write_text(json.dumps(c))
+    return path
+
+
+@pytest.fixture
+def snap2(tmp_path):
+    d = _run_dir(tmp_path)
+    return site.snapshot_from_runs(
+        {"league": d, "demo": d},
+        "2026-11-22-test",
+        2026,
+        1000,
+        "freedman-lane",
+        _confirm_json(tmp_path),
+        status="final",
+    )
+
+
+def test_v2_snapshot_holds_only_closed_vocabulary(snap2, tmp_path):
+    assert set(snap2) == site.TOP_KEYS_V2
+    assert [s["scope"] for s in snap2["sections"]] == ["league", "demo"]
+    assert all(set(r) == site.ROW_KEYS for s in snap2["sections"] for r in s["rows"])
+    assert set(snap2["confirmatory"]) == site.CONFIRM_KEYS
+    assert snap2["confirmatory"]["confirmed"] is False
+    dumped = json.dumps(snap2)
+    assert "preregistration.md" not in dumped and "excluded_fanbases" not in dumped
+    path = site.write_snapshot(snap2, tmp_path / "pub")
+    assert site.load_snapshot(path) == snap2
+
+
+def test_v2_confirm_must_be_a_decided_fld_z_test(tmp_path):
+    d = _run_dir(tmp_path)
+    for over in ({"metric": "OPS"}, {"decision": "INVALID"}):
+        with pytest.raises(SnapshotError):
+            site.snapshot_from_runs(
+                {"league": d}, "x", 2026, 1000, "shuffle", _confirm_json(tmp_path, **over)
+            )
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda s: s.update(rows=[]),
+        lambda s: s.update(null="made up"),
+        lambda s: s.update(sections=[]),
+        lambda s: s["sections"][0].update(scope="some other scope"),
+        lambda s: s["sections"][1].update(scope="league"),
+        lambda s: s["sections"][0].update(title="free text"),
+        lambda s: s["sections"][0]["rows"][0].update(text="great game by him"),
+        lambda s: s["sections"][0].update(rows=[]),
+        lambda s: s["confirmatory"].update(note="free text"),
+        lambda s: s["confirmatory"].update(metric="Seiya Suzuki"),
+        lambda s: s["confirmatory"].update(confirmed="no"),
+        lambda s: s["confirmatory"].update(perm_p_less=0.0123),
+        lambda s: s["confirmatory"].update(mu_mean=5.0),
+        lambda s: s["confirmatory"].update(n_obs=True),
+        lambda s: s.pop("confirmatory"),
+    ],
+)
+def test_v2_validate_rejects(snap2, mutate):
+    bad = copy.deepcopy(snap2)
+    mutate(bad)
+    with pytest.raises(SnapshotError):
+        validate_snapshot(bad)
+
+
+def test_v2_render(snap2):
+    page = site.render_html(snap2)
+    for section in ("h-confirm", "h-league", "h-demo", "h-method", "h-caveats"):
+        assert f'id="{section}"' in page
+    assert page.count('role="img"') == 4
+    for key in ("forest-league", "perm-league", "forest-demo", "perm-demo"):
+        assert page.count(f'id="{key}-t"') == 1
+    assert "<script" not in page.lower()
+    assert "Pre-registered test: not confirmed" in page and "no evidence" in page
+    assert "Freedman-Lane permutation" in page
+    assert 'class="prelim"' not in page and "(preliminary)" not in page
+    assert 'class="prelim"' in site.render_html({**snap2, "status": "preliminary"})
+    no_confirm = site.render_html({**snap2, "confirmatory": None})
+    assert 'id="h-confirm"' not in no_confirm and "no evidence" not in no_confirm
+
+
+def test_pooled_fanbase_is_not_labelled_as_a_subreddit():
+    assert site.fanbase_label("pooled") == "All fanbases, pooled"
+
+
+def test_cli_snapshot_sections(tmp_path):
+    d = _run_dir(tmp_path)
+    pub = tmp_path / "pub"
+    args = ["snapshot", "--section", f"league={d}", "--confirm", str(_confirm_json(tmp_path))]
+    cli.main([*args, "--run-id", "2026-11-22-x", "--status", "final", "--out-dir", str(pub)])
+    snap = site.load_snapshot(pub / "2026-11-22-x.json")
+    assert snap["schema_version"] == 2 and snap["null"] == "freedman-lane"
+    with pytest.raises(SystemExit):
+        cli.main([*args, "--out-dir", str(pub)])

@@ -372,6 +372,8 @@ rendered from an aggregate-only snapshot, so it builds without `data/`:
 
 ```sh
 uv run fansent snapshot data/runs/<run-id>   # analysis_fanbases.csv -> results/published/<run-id>.json
+uv run fansent snapshot --run-id <id> --section league=<run-dir> --section demo=<run-dir> \
+    --confirm data/league/confirm_result.json --status final   # several runs on one page
 uv run fansent site                          # newest snapshot -> site/index.html (+ data.json)
 python -m http.server -d site                # preview
 ```
@@ -379,7 +381,10 @@ python -m http.server -d site                # preview
 The snapshot holds only per-(metric, fanbase) summary numbers from `analysis_fanbases.csv`;
 `fansent.site.validate_snapshot` rejects unknown keys, any string outside the metric/family
 vocabulary or a short identifier pattern, and non-finite numbers, so free text cannot be
-published. Per-player files (`analysis_units.csv`) are never read. Commit the snapshot to
+published. Per-player files (`analysis_units.csv`) are never read. With `--section` (2026-11-22)
+the snapshot is schema 2: one block of rows per scope (`league`, `demo`; their headings and
+descriptions are fixed text in `site.py`), the null used, and, with `--confirm`, nine summary
+numbers of the pre-registered test picked out of `confirm_result.json`. Commit the snapshot to
 publish a new run; `.github/workflows/pages.yml` rebuilds and deploys on every push to `main`
 (and on manual dispatch). Charts are inline SVG generated in Python (no JavaScript), themed by
 `prefers-color-scheme`, and the page sets no frame restrictions so it can be embedded in an
