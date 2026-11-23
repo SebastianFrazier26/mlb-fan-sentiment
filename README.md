@@ -30,6 +30,16 @@ predicts his next-week performance beyond what his recent performance already pr
   borderline in the Cubs and Red Sox data (q 0.05 to 0.09) and appears nowhere else. We read
   it as unconfirmed.
 
+![Pre-registered fielding test: the two-team effects sit well below zero, the league result sits on it](docs/img/confirmatory.svg)
+
+![Whole league, pooled: seven metrics, every interval covering zero](docs/img/league.svg)
+
+![Cubs and Red Sox fielding effects by fanbase](docs/img/demo-fielding.svg)
+
+Effects are in sd of next-week performance per sd of fan sentiment, with 95% credible
+intervals. The figures are drawn by `fansent figures` from the committed aggregate snapshot
+(`results/published/2026-11-22-final.json`), so they need none of the private data.
+
 Full numbers, the permutation-null bias found along the way, and one correction to an earlier
 version of the write-up: [`docs/results-2026-11.md`](docs/results-2026-11.md). Everything here
 is one season of observational data; the limits are listed in that note.
@@ -374,6 +384,7 @@ rendered from an aggregate-only snapshot, so it builds without `data/`:
 uv run fansent snapshot data/runs/<run-id>   # analysis_fanbases.csv -> results/published/<run-id>.json
 uv run fansent snapshot --run-id <id> --section league=<run-dir> --section demo=<run-dir> \
     --confirm data/league/confirm_result.json --status final   # several runs on one page
+uv run fansent figures                       # newest snapshot -> docs/img/*.svg (README figures)
 uv run fansent site                          # newest snapshot -> site/index.html (+ data.json)
 python -m http.server -d site                # preview
 ```
@@ -382,8 +393,9 @@ The snapshot holds only per-(metric, fanbase) summary numbers from `analysis_fan
 `fansent.site.validate_snapshot` rejects unknown keys, any string outside the metric/family
 vocabulary or a short identifier pattern, and non-finite numbers, so free text cannot be
 published. Per-player files (`analysis_units.csv`) are never read. With `--section` (2026-11-22)
-the snapshot is schema 2: one block of rows per scope (`league`, `demo`; their headings and
-descriptions are fixed text in `site.py`), the null used, and, with `--confirm`, nine summary
+the snapshot is schema 2: one block of rows per scope (`league`, `demo`, and the data-only
+`league_fanbases`, which the page does not draw; their headings and descriptions are fixed text
+in `site.py`), the null used, and, with `--confirm`, nine summary
 numbers of the pre-registered test picked out of `confirm_result.json`. Commit the snapshot to
 publish a new run; `.github/workflows/pages.yml` rebuilds and deploys on every push to `main`
 (and on manual dispatch). Charts are inline SVG generated in Python (no JavaScript), themed by

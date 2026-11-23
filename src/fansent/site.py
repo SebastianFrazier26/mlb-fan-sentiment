@@ -86,7 +86,14 @@ SCOPES = {
             "test was written to check."
         ),
     ),
+    "league_fanbases": (
+        "Every fanbase",
+        "One effect per metric and fanbase across the league, news excluded.",
+    ),
 }
+# Carried for readers of the snapshot (the results post). The static page has no chart for a
+# table this long, and its palette stops at N_SLOTS fanbases.
+DATA_ONLY_SCOPES = frozenset({"league_fanbases"})
 
 
 class SnapshotError(ValueError):
@@ -780,7 +787,8 @@ NULL_TEXT = {
 
 
 def _render_v2(snap: dict) -> str:
-    rows = [r for sec in snap["sections"] for r in sec["rows"]]
+    shown = [sec for sec in snap["sections"] if sec["scope"] not in DATA_ONLY_SCOPES]
+    rows = [r for sec in shown for r in sec["rows"]]
     c = snap["confirmatory"]
     prelim = snap["status"] == "preliminary"
     if c is not None and not c["confirmed"]:
@@ -817,7 +825,7 @@ better the next week, beyond what his current form already predicts? {answer}</p
 <p>Effects &#956; are in SD of next-week performance per SD of fan sentiment. Positive means
 optimism preceded better play.</p>
 {_confirm_block(c, snap["alpha"])}
-{"".join(_section_block(snap, sec) for sec in snap["sections"])}
+{"".join(_section_block(snap, sec) for sec in shown)}
 <section aria-labelledby="h-method">
 <h2 id="h-method">Method</h2>
 <dl>

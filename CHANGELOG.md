@@ -12,12 +12,15 @@
   mu must be read against the center of its permutation null, which is off zero where sentiment
   varies mostly between players (league OAA: +0.028). README method section and
   `docs/results-2026-11.md` explain how to read it. `confirm` is unchanged.
+- README shows the results as three static figures (`docs/img/*.svg`), written by the new
+  `fansent figures` from the committed snapshot. The snapshot gains a data-only scope,
+  `league_fanbases`: the 218 per-fanbase aggregate rows, validated like every other row and not
+  drawn on the static page.
 - Aggregate snapshot `2026-11-22-final` (league pooled, Cubs and Red Sox, and the
   pre-registered test result): the data feed for the results post and the README figures.
   `fansent snapshot --section SCOPE=RUN_DIR ... --confirm confirm_result.json` writes the new
   schema-2 snapshot; the page states the null result and describes the Freedman-Lane null.
   Schema-1 snapshots still load and render as before.
-
 
 ## 2026-11-21
 
@@ -28,7 +31,6 @@
   updated after re-scoring with the weekly-team relevance filter (league drop rate 5.0% to 5.3%,
   demo 16.8% to 14.6%). Also fixed: 218 per-fanbase cells, not about 250, and the ERA fits are
   flagged as unconverged (R-hat 1.064).
-
 
 ## 2026-11-19
 

@@ -286,3 +286,16 @@ def test_cli_snapshot_sections(tmp_path):
     assert snap["schema_version"] == 2 and snap["null"] == "freedman-lane"
     with pytest.raises(SystemExit):
         cli.main([*args, "--out-dir", str(pub)])
+
+
+def test_v2_data_only_scope_is_validated_but_not_rendered(tmp_path):
+    d = _run_dir(tmp_path)
+    snap = site.snapshot_from_runs(
+        {"league": d, "league_fanbases": d}, "2026-11-22-x", 2026, 1000, "freedman-lane"
+    )
+    page = site.render_html(snap)
+    assert 'id="h-league"' in page and "h-league_fanbases" not in page
+    bad = copy.deepcopy(snap)
+    bad["sections"][1]["rows"][0]["fanbase"] = "u/some user"
+    with pytest.raises(SnapshotError):
+        validate_snapshot(bad)

@@ -295,7 +295,8 @@ def main(argv: list[str] | None = None) -> None:
         action="append",
         default=[],
         metavar="SCOPE=RUN_DIR",
-        help="Schema-2 snapshot with one section per scope (league, demo); repeatable, replaces "
+        help="Schema-2 snapshot with one section per scope (league, demo, league_fanbases); "
+        "repeatable, replaces "
         "run_dir and needs --run-id",
     )
     p.add_argument(
@@ -316,6 +317,12 @@ def main(argv: list[str] | None = None) -> None:
     )
     p.add_argument("--alpha", type=float, default=0.05)
     p.add_argument("--out-dir", default="results/published")
+
+    p = sub.add_parser(
+        "figures", help="Write the README's static SVG figures from a published snapshot"
+    )
+    p.add_argument("--snapshot", help="Snapshot JSON (default: newest in results/published)")
+    p.add_argument("--out", default="docs/img", help="Output directory (default: docs/img)")
 
     p = sub.add_parser("site", help="Render the static results site from a published snapshot")
     p.add_argument("--snapshot", help="Snapshot JSON (default: newest in results/published)")
@@ -441,6 +448,16 @@ def main(argv: list[str] | None = None) -> None:
                 args.status,
             )
         print(f"wrote {site.write_snapshot(snap, Path(args.out_dir))}")
+    elif args.command == "figures":
+        from . import figures, site
+
+        snap_path = (
+            Path(args.snapshot)
+            if args.snapshot
+            else site.latest_snapshot(site.DEFAULT_PUBLISHED_DIR)
+        )
+        for path in figures.write_figures(snap_path, Path(args.out)):
+            print(f"wrote {path}")
     elif args.command == "site":
         from . import site
 
