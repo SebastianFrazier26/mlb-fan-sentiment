@@ -1,6 +1,20 @@
 # Results: league-wide fielding test and follow-ups (2026 season)
 
-Recorded 2026-11-19. Aggregate numbers only. The Reddit text behind them is private.
+Recorded 2026-11-19, corrected 2026-11-21, closed out 2026-11-22. Aggregate numbers only. The
+Reddit text behind them is private.
+
+## Summary
+
+- The one pre-registered test, that upbeat fan sentiment precedes worse fielding in the rest of
+  the league, was **not confirmed** (mu -0.0023, 95% CrI [-0.022, +0.017], one-sided p 0.183).
+- Nothing exploratory clears correction league-wide, pooled or per fanbase.
+- The Cubs and Red Sox fielding signal that prompted the test is borderline in those two teams'
+  data (q 0.05 to 0.09) and is unconfirmed.
+- Two method problems were found and fixed after the test, neither of which changes its
+  outcome: the original permutation null was biased, and the pooled estimate has to be read
+  against its null center rather than zero.
+- Conclusion for the 2026 season: no evidence that fan sentiment about a player predicts his
+  next-week performance beyond what his recent performance already predicts.
 
 ## Pre-registered confirmatory test: not confirmed
 
@@ -140,3 +154,24 @@ unconfirmed and specific to those fanbases.
 - Classifier generalization: the frozen classifier's agreement with Sonnet labels on 1,883
   comments from other fanbases (macro-F1 0.530, Spearman 0.356) was close to its in-domain
   level (0.548, 0.405).
+
+## Limits
+
+- One season of observational data. Nothing here is causal.
+- Sentiment comes from our own classifier (agreement with human labels is moderate) and from
+  name matching; both add noise, which pulls effects toward zero.
+- The same player appears under several fanbases, so rows and per-fanbase cells are not
+  independent, and the pooled interval is somewhat narrow.
+- Reddit only. The news fanbase was set aside: it reached the minimum data on 4 players at
+  most.
+- The pooled league fit can detect effects near 0.03 sd per sd; a single team's fit only about
+  0.2. Smaller effects than that are not ruled out.
+- Only the `FLD_Z` league test was registered in advance. The within-player estimator, the
+  Freedman-Lane null and `mu_minus_null` were all introduced after it.
+
+## If this is picked up again
+
+A 2027 season would allow a clean replication. It would need a new pre-registration, written
+before any 2027 data is analyzed, naming the estimator (pooled or within-player), the null
+(Freedman-Lane) and the outcome. The 2026 data cannot be reused to confirm anything found in
+it.
