@@ -200,10 +200,10 @@ Per metric (OPS, AVG, ERA, WHIP, FLD_PCT, ERRORS, CS_PCT, and a COMPOSITE index)
 6. **OAA check.** Monthly mean sentiment vs next-month Outs Above Average (consecutive months),
    controlling current-month OAA and cumulative season OAA, through the same model and
    permutation, unweighted (the Savant export has no attempts column). A unit needs >= 3
-consecutive-month pairs (month m with OAA and sentiment, month m+1 with OAA); the cumulative
-control is the sum of the independent monthly values up to m. March and April are one bucket
-labeled 2026-04, so that month is longer than the rest. Monthly data gives ~5 points per unit, too few
-   for per-unit partial correlations, so the hierarchical pooling is used instead.
+   consecutive-month pairs (month m with OAA and sentiment, month m+1 with OAA); the cumulative
+   control is the sum of the independent monthly values up to m. March and April are one bucket
+   labeled 2026-04, so that month is longer than the rest. Monthly data gives ~5 points per unit,
+   too few for per-unit partial correlations, so the hierarchical pooling is used instead.
 
 **Fit settings and scope flags (2026-11-17).**
 
