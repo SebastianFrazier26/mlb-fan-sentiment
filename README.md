@@ -8,9 +8,6 @@ week *t+1*, beyond what week *t* performance (and season-to-date form) already p
 Fanbases compared: all 30 team subreddits, r/baseball (neutral baseline), and `news` (GDELT
 headlines) — each judged only on the tracked players it talks about.
 
-**Results site:** <https://sebastianfrazier26.github.io/mlb-fan-sentiment/> (see
-[Results site](#results-site)).
-
 ## Result (2026 season)
 
 **No.** Across the 2026 regular season we find no evidence that fan sentiment about a player
@@ -375,35 +372,30 @@ the registered decision uses the permutation p. `confirm` also prints and writes
 supplementary (post-hoc null fix, not part of the registered decision), the Freedman-Lane
 one-sided p and the null-centered two-sided p. Anything beyond this single test is exploratory.
 
-## Results site
+## Results snapshot and figures
 
-A static page (forest plot of fanbase effects, permutation-null comparison, method, caveats)
-rendered from an aggregate-only snapshot, so it builds without `data/`:
+Published results leave `data/` only as an aggregate snapshot, and the README figures are drawn
+from that snapshot alone:
 
 ```sh
-uv run fansent snapshot data/runs/<run-id>   # analysis_fanbases.csv -> results/published/<run-id>.json
 uv run fansent snapshot --run-id <id> --section league=<run-dir> --section demo=<run-dir> \
-    --confirm data/league/confirm_result.json --status final   # several runs on one page
+    --section league_fanbases=<run-dir> --confirm data/league/confirm_result.json --status final
 uv run fansent figures                       # newest snapshot -> docs/img/*.svg (README figures)
-uv run fansent site                          # newest snapshot -> site/index.html (+ data.json)
-python -m http.server -d site                # preview
+uv run fansent site                          # optional local page: site/index.html (+ data.json)
 ```
 
 The snapshot holds only per-(metric, fanbase) summary numbers from `analysis_fanbases.csv`;
 `fansent.site.validate_snapshot` rejects unknown keys, any string outside the metric/family
 vocabulary or a short identifier pattern, and non-finite numbers, so free text cannot be
-published. Per-player files (`analysis_units.csv`) are never read. With `--section` (2026-11-22)
-the snapshot is schema 2: one block of rows per scope (`league`, `demo`, and the data-only
-`league_fanbases`, which the page does not draw; their headings and descriptions are fixed text
-in `site.py`), the null used, and, with `--confirm`, nine summary
-numbers of the pre-registered test picked out of `confirm_result.json`. Commit the snapshot to
-publish a new run; `.github/workflows/pages.yml` rebuilds and deploys on every push to `main`
-(and on manual dispatch). Charts are inline SVG generated in Python (no JavaScript), themed by
-`prefers-color-scheme`, and the page sets no frame restrictions so it can be embedded in an
-iframe.
+published. Per-player files (`analysis_units.csv`) are never read. A schema-2 snapshot
+(`--section`, 2026-11-22) has one block of rows per scope (`league`, `demo`, and the data-only
+`league_fanbases`; their headings and descriptions are fixed text in `site.py`), the null used,
+and, with `--confirm`, nine summary numbers of the pre-registered test picked out of
+`confirm_result.json`. `fansent snapshot <run-dir>` without `--section` still writes the older
+one-run format.
 
-One-time setup (repo owner): Settings -> Pages -> Build and deployment -> Source: **GitHub
-Actions**. Until then the deploy job fails and the URL above returns 404.
+The GitHub Pages site was retired on 2026-11-22: the static results are the figures in this
+README, and `fansent site` remains only as a local preview of a snapshot.
 
 ## Notes & caveats
 

@@ -7,9 +7,7 @@ needs, and what exists already.
 
 - Planned (owner decision 2026-11-22): an animated post at `sebastianfrazier.com/blog/`, built
   in the portfolio repository from an aggregate-only snapshot of these results.
-- The GitHub Pages page (<https://sebastianfrazier26.github.io/mlb-fan-sentiment/>) still shows
-  the preliminary October snapshot and is to be retired; the static results will live in this
-  README instead.
+- The GitHub Pages page is retired; the static results are the figures in the README.
 - Repository: <https://github.com/SebastianFrazier26/mlb-fan-sentiment>.
 
 ## Screenshots to take (once the post is live)
