@@ -289,7 +289,23 @@ def main(argv: list[str] | None = None) -> None:
         "snapshot",
         help="Write the aggregate-only public snapshot of a correlate run (results/published)",
     )
-    p.add_argument("run_dir", help="Directory holding analysis_fanbases.csv")
+    p.add_argument("run_dir", nargs="?", help="Directory holding analysis_fanbases.csv")
+    p.add_argument(
+        "--section",
+        action="append",
+        default=[],
+        metavar="SCOPE=RUN_DIR",
+        help="Schema-2 snapshot with one section per scope (league, demo, league_fanbases); "
+        "repeatable, replaces "
+        "run_dir and needs --run-id",
+    )
+    p.add_argument(
+        "--null",
+        choices=["freedman-lane", "shuffle"],
+        default="freedman-lane",
+        help="Permutation null the --section runs used",
+    )
+    p.add_argument("--confirm", help="confirm_result.json to summarize (with --section)")
     p.add_argument("--run-id", help="Snapshot id (default: the run directory's name)")
     p.add_argument("--season", type=int, default=2026)
     p.add_argument("--perm-b", type=int, default=1000, help="--perm-b the run used")
@@ -301,6 +317,12 @@ def main(argv: list[str] | None = None) -> None:
     )
     p.add_argument("--alpha", type=float, default=0.05)
     p.add_argument("--out-dir", default="results/published")
+
+    p = sub.add_parser(
+        "figures", help="Write the README's static SVG figures from a published snapshot"
+    )
+    p.add_argument("--snapshot", help="Snapshot JSON (default: newest in results/published)")
+    p.add_argument("--out", default="docs/img", help="Output directory (default: docs/img)")
 
     p = sub.add_parser("site", help="Render the static results site from a published snapshot")
     p.add_argument("--snapshot", help="Snapshot JSON (default: newest in results/published)")
@@ -400,16 +422,42 @@ def main(argv: list[str] | None = None) -> None:
     elif args.command == "snapshot":
         from . import site
 
-        run_dir = Path(args.run_dir)
-        snap = site.snapshot_from_run(
-            run_dir,
-            args.run_id or run_dir.resolve().name,
-            args.season,
-            args.perm_b,
-            args.alpha,
-            args.status,
-        )
+        if args.section:
+            if args.run_dir or not args.run_id:
+                parser.error("--section replaces run_dir and needs --run-id")
+            snap = site.snapshot_from_runs(
+                {k: Path(v) for k, v in (s.split("=", 1) for s in args.section)},
+                args.run_id,
+                args.season,
+                args.perm_b,
+                args.null,
+                Path(args.confirm) if args.confirm else None,
+                args.alpha,
+                args.status,
+            )
+        else:
+            if not args.run_dir:
+                parser.error("run_dir or --section is required")
+            run_dir = Path(args.run_dir)
+            snap = site.snapshot_from_run(
+                run_dir,
+                args.run_id or run_dir.resolve().name,
+                args.season,
+                args.perm_b,
+                args.alpha,
+                args.status,
+            )
         print(f"wrote {site.write_snapshot(snap, Path(args.out_dir))}")
+    elif args.command == "figures":
+        from . import figures, site
+
+        snap_path = (
+            Path(args.snapshot)
+            if args.snapshot
+            else site.latest_snapshot(site.DEFAULT_PUBLISHED_DIR)
+        )
+        for path in figures.write_figures(snap_path, Path(args.out)):
+            print(f"wrote {path}")
     elif args.command == "site":
         from . import site
 

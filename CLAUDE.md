@@ -25,7 +25,8 @@ progress; read at session start, update on meaningful deltas).
 - `src/fansent/power.py` — `fansent power`: simulated power curves and MDE of the fanbase test
 - `src/fansent/names.py`, `util.py` — name matching, paths, CSV I/O (also imported by `fansent-collect`)
 - `src/fansent/label.py` — `fansent label`: localhost-only labeling page for eval CSVs (data stays local, gitignored)
-- `src/fansent/site.py` — `fansent snapshot` (run -> aggregate-only `results/published/<run-id>.json`, schema-validated) and `fansent site` (snapshot -> static `site/`, gitignored); only aggregate numbers may ever be published
+- `src/fansent/site.py` — `fansent snapshot` (run -> aggregate-only `results/published/<run-id>.json`, schema-validated; `--section SCOPE=RUN_DIR` + `--confirm` = schema 2, several runs and the pre-registered result on one page) and `fansent site` (snapshot -> static `site/`, gitignored); only aggregate numbers may ever be published
+- `src/fansent/figures.py` — `fansent figures`: standalone static SVGs for the README (`docs/img/`) from a schema-2 snapshot; a test fails if the committed figures drift from the snapshot
 - `tests/` — pytest; `.github/workflows/ci.yml` — lint, format, test, pip-audit; `pages.yml` — build site from the newest snapshot, deploy to GitHub Pages
 - `data/` — generated CSVs, gitignored; location overridable via `fansent --data-dir DIR` / `$FANSENT_DATA_DIR` (`util.resolve_data_dir`, resolved once in `cli.main` and passed to each `run(..., data_dir)`; modules hold filename constants only, never full paths)
 

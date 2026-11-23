@@ -4,6 +4,11 @@ The snapshot is the only thing that crosses from gitignored `data/` into the pub
 is built from `analysis_fanbases.csv` alone (per-fanbase summary numbers) and every string in
 it must match a closed vocabulary or a short identifier pattern. `validate_snapshot` enforces
 that on write and on read, so a snapshot carrying free text cannot be published or rendered.
+
+Schema 1 is one run (`rows`). Schema 2 (2026-11-22) is the final write-up: several runs as
+`sections` keyed by a closed scope vocabulary, the permutation null used, and the summary
+numbers of the pre-registered confirmatory test. All prose about a scope lives here in `SCOPES`,
+never in the snapshot.
 """
 
 from __future__ import annotations
@@ -56,6 +61,40 @@ INT_KEYS = ("n_units", "n_obs")
 ROW_KEYS = {"family", "exploratory", "metric", "fanbase", *FLOAT_KEYS, *NULLABLE_FLOAT_KEYS}
 ROW_KEYS |= set(INT_KEYS)
 
+SCHEMA_V2 = 2
+TOP_KEYS_V2 = (TOP_KEYS - {"rows"}) | {"null", "sections", "confirmatory"}
+SECTION_KEYS = {"scope", "rows"}
+NULLS = ("freedman-lane", "shuffle")
+CONFIRM_METRIC = "FLD_Z"
+CONFIRM_FLOAT_KEYS = ("mu_mean", "ci_low", "ci_high", "perm_p_less", "rhat_max")
+CONFIRM_KEYS = {"metric", "confirmed", *CONFIRM_FLOAT_KEYS, *INT_KEYS}
+# scope -> (heading, description). Fixed text: a snapshot can only pick a scope, not describe it.
+SCOPES = {
+    "league": (
+        "Whole league",
+        (
+            "The other 28 teams' subreddits plus r/baseball, fitted as one pooled effect. Cubs "
+            "and Red Sox players are left out because the first analysis was built on them."
+        ),
+    ),
+    "demo": (
+        "Cubs and Red Sox",
+        (
+            "The original two-team analysis: r/CHICubs, r/redsox, and r/baseball restricted to "
+            "Cubs and Red Sox players (news headlines reach the minimum on too few players to "
+            "read anything into). Its fielding rows are the signal the pre-registered league "
+            "test was written to check."
+        ),
+    ),
+    "league_fanbases": (
+        "Every fanbase",
+        "One effect per metric and fanbase across the league, news excluded.",
+    ),
+}
+# Carried for readers of the snapshot (the results post). The static page has no chart for a
+# table this long, and its palette stops at N_SLOTS fanbases.
+DATA_ONLY_SCOPES = frozenset({"league_fanbases"})
+
 
 class SnapshotError(ValueError):
     pass
@@ -103,6 +142,46 @@ def snapshot_from_run(
     return snap
 
 
+def snapshot_from_runs(
+    run_dirs: dict[str, Path],
+    run_id: str,
+    season: int,
+    perm_b: int,
+    null: str,
+    confirm_path: Path | None = None,
+    alpha: float = 0.05,
+    status: str = "preliminary",
+) -> dict:
+    """Schema-2 snapshot: one section per scope, each from that run's analysis_fanbases.csv."""
+    sections = []
+    for scope, run_dir in run_dirs.items():
+        one = snapshot_from_run(run_dir, run_id, season, perm_b, alpha, status)
+        sections.append({"scope": scope, "rows": one["rows"]})
+    base = {k: v for k, v in one.items() if k != "rows"}
+    snap = {
+        **base,
+        "schema_version": SCHEMA_V2,
+        "null": null,
+        "sections": sections,
+        "confirmatory": _confirm_summary(confirm_path) if confirm_path else None,
+    }
+    validate_snapshot(snap)
+    return snap
+
+
+def _confirm_summary(path: Path) -> dict:
+    """Picks the summary numbers out of `fansent confirm`'s result JSON; nothing else is copied."""
+    c = json.loads(path.read_text(encoding="utf-8"))
+    if c["metric"] != CONFIRM_METRIC or c["decision"] not in ("CONFIRMED", "NOT CONFIRMED"):
+        raise SnapshotError("confirm result is not a decided FLD_Z test")
+    return {
+        "metric": CONFIRM_METRIC,
+        "confirmed": c["decision"] == "CONFIRMED",
+        **{k: round(float(c[k]), 6) for k in CONFIRM_FLOAT_KEYS},
+        **{k: int(c[k]) for k in INT_KEYS},
+    }
+
+
 def _round(v: float | None) -> float | None:
     return None if v is None else round(v, 6)
 
@@ -112,10 +191,14 @@ def _is_num(v) -> bool:
 
 
 def validate_snapshot(snap: dict) -> None:
-    if not isinstance(snap, dict) or set(snap) != TOP_KEYS:
-        raise SnapshotError(f"top-level keys must be exactly {sorted(TOP_KEYS)}")
-    if snap["schema_version"] != SCHEMA_VERSION:
-        raise SnapshotError(f"unsupported schema_version {snap['schema_version']!r}")
+    if not isinstance(snap, dict):
+        raise SnapshotError("snapshot must be an object")
+    version = snap.get("schema_version")
+    if version not in (SCHEMA_VERSION, SCHEMA_V2):
+        raise SnapshotError(f"unsupported schema_version {version!r}")
+    top = TOP_KEYS if version == SCHEMA_VERSION else TOP_KEYS_V2
+    if set(snap) != top:
+        raise SnapshotError(f"top-level keys must be exactly {sorted(top)}")
     if not isinstance(snap["run_id"], str) or not RUN_ID_RE.match(snap["run_id"]):
         raise SnapshotError("run_id must be a short identifier")
     try:
@@ -132,11 +215,53 @@ def validate_snapshot(snap: dict) -> None:
         raise SnapshotError("correction must be 'bh' or 'holm'")
     if snap["status"] not in STATUSES:
         raise SnapshotError(f"status must be one of {STATUSES}")
-    rows = snap["rows"]
+    if version == SCHEMA_VERSION:
+        _validate_rows(snap["rows"], snap["perm_b"])
+        return
+    if snap["null"] not in NULLS:
+        raise SnapshotError(f"null must be one of {NULLS}")
+    sections = snap["sections"]
+    if not isinstance(sections, list) or not sections:
+        raise SnapshotError("sections must be a non-empty list")
+    seen = set()
+    for sec in sections:
+        if not isinstance(sec, dict) or set(sec) != SECTION_KEYS:
+            raise SnapshotError(f"section keys must be exactly {sorted(SECTION_KEYS)}")
+        if sec["scope"] not in SCOPES or sec["scope"] in seen:
+            raise SnapshotError(f"section scope must be a distinct one of {sorted(SCOPES)}")
+        seen.add(sec["scope"])
+        _validate_rows(sec["rows"], snap["perm_b"])
+    if snap["confirmatory"] is not None:
+        _validate_confirm(snap["confirmatory"], snap["perm_b"])
+
+
+def _validate_rows(rows, perm_b: int) -> None:
     if not isinstance(rows, list) or not rows:
         raise SnapshotError("rows must be a non-empty list")
     for i, r in enumerate(rows):
-        _validate_row(i, r, snap["perm_b"])
+        _validate_row(i, r, perm_b)
+
+
+def _on_perm_grid(p: float, perm_b: int) -> bool:
+    # p = (1 + count) / (1 + B), so a mismatched perm_b shows up as a non-integer count.
+    count = p * (perm_b + 1) - 1
+    return abs(count - round(count)) <= 1e-3
+
+
+def _validate_confirm(c, perm_b: int) -> None:
+    if not isinstance(c, dict) or set(c) != CONFIRM_KEYS:
+        raise SnapshotError(f"confirmatory keys must be exactly {sorted(CONFIRM_KEYS)}")
+    if c["metric"] != CONFIRM_METRIC or not isinstance(c["confirmed"], bool):
+        raise SnapshotError("confirmatory: metric must be FLD_Z and confirmed a bool")
+    if not all(_is_num(c[k]) for k in CONFIRM_FLOAT_KEYS):
+        raise SnapshotError("confirmatory: numbers must be finite")
+    for k in INT_KEYS:
+        if not isinstance(c[k], int) or isinstance(c[k], bool) or c[k] < 0:
+            raise SnapshotError(f"confirmatory: {k} must be a non-negative int")
+    if not c["ci_low"] <= c["mu_mean"] <= c["ci_high"]:
+        raise SnapshotError("confirmatory: mu_mean outside its interval")
+    if not 0 <= c["perm_p_less"] <= 1 or not _on_perm_grid(c["perm_p_less"], perm_b):
+        raise SnapshotError("confirmatory: perm_p_less is not on the 1/(perm_b+1) grid")
 
 
 def _validate_row(i: int, r: dict, perm_b: int) -> None:
@@ -170,9 +295,7 @@ def _validate_row(i: int, r: dict, perm_b: int) -> None:
     for k in ("p_pos", "perm_p"):
         if not 0 <= r[k] <= 1:
             raise SnapshotError(f"{where}: {k} must be a probability")
-    # perm_p = (1 + count) / (1 + B), so a mismatched perm_b shows up as a non-integer count.
-    count = r["perm_p"] * (perm_b + 1) - 1
-    if abs(count - round(count)) > 1e-3:
+    if not _on_perm_grid(r["perm_p"], perm_b):
         raise SnapshotError(f"{where}: perm_p is not on the 1/(perm_b+1) grid")
 
 
@@ -213,7 +336,12 @@ METRIC_LABELS = {
 N_SLOTS = 8
 
 
+POOLED_FANBASE = "pooled"
+
+
 def fanbase_label(fb: str) -> str:
+    if fb == POOLED_FANBASE:
+        return "All fanbases, pooled"
     return "News headlines" if fb == "news" else f"r/{fb}"
 
 
@@ -299,7 +427,7 @@ def _metric_bands(groups, x0: float, x1: float) -> list[str]:
     return out
 
 
-def forest_svg(snap: dict) -> str:
+def forest_svg(snap: dict, key: str = "forest") -> str:
     fanbases = _fanbases(snap["rows"])
     rows = _ordered_rows(snap["rows"], fanbases)
     ys, groups, height = _layout(rows)
@@ -360,10 +488,10 @@ def forest_svg(snap: dict) -> str:
         "metric and fanbase. Filled dots are significant after correction. "
         "The data table below lists every value."
     )
-    return _svg("forest", "Fanbase effects with 95% credible intervals", desc, height, parts)
+    return _svg(key, "Fanbase effects with 95% credible intervals", desc, height, parts)
 
 
-def perm_svg(snap: dict) -> str:
+def perm_svg(snap: dict, key: str = "perm") -> str:
     fanbases = _fanbases(snap["rows"])
     rows = _ordered_rows(snap["rows"], fanbases)
     ys, groups, height = _layout(rows)
@@ -420,7 +548,7 @@ def perm_svg(snap: dict) -> str:
         "(diamonds) per metric and fanbase on a log axis, with the significance threshold "
         "marked. The data table below lists every value."
     )
-    return _svg("perm", "Observed effects against the permutation null", desc, height, parts)
+    return _svg(key, "Observed effects against the permutation null", desc, height, parts)
 
 
 def _svg(key: str, title: str, desc: str, height: float, parts: list[str]) -> str:
@@ -589,8 +717,163 @@ def _status_banner(snap: dict) -> str:
     )
 
 
+def _confirm_block(c: dict | None, alpha: float) -> str:
+    if c is None:
+        return ""
+    verdict = "Confirmed" if c["confirmed"] else "Not confirmed"
+    return f"""<section aria-labelledby="h-confirm">
+<h2 id="h-confirm">Pre-registered test: {verdict.lower()}</h2>
+<p>The two-team analysis suggested that upbeat weeks preceded <em>worse</em> fielding. Before
+looking at any other team we <a href="{REPO_URL}/blob/main/docs/preregistration.md">registered
+one test</a> of that on the rest of the league: a pooled fielding effect below zero, one-sided
+p &lt; {alpha:g}.</p>
+<div class="tiles"><div class="tile"><div class="tile-h">Fielding, rest of league</div>
+<div class="big">{_f(c["mu_mean"], 3)}</div>
+<div class="sub">95% CrI {_f(c["ci_low"], 3)} to {_f(c["ci_high"], 3)} &middot;
+one-sided p = {_p(c["perm_p_less"])}</div>
+<div class="verdict"><strong>{verdict}</strong> &middot; {c["n_units"]:,} fanbase-player
+pairs, {c["n_obs"]:,} player-weeks</div></div></div>
+</section>"""
+
+
+def _section_block(snap: dict, sec: dict) -> str:
+    scope = sec["scope"]
+    title, blurb = SCOPES[scope]
+    part = {**snap, "rows": sec["rows"]}
+    fanbases = _fanbases(sec["rows"])
+    n_tests = sum(not r["exploratory"] for r in sec["rows"])
+    n_sig = sum(_sig(r, part) for r in sec["rows"])
+    corr = "Benjamini-Hochberg" if snap["correction"] == "bh" else "Holm"
+    sig_key = (
+        '<li><span class="key fill" aria-hidden="true"></span>significant after correction</li>'
+        '<li><span class="key" aria-hidden="true"></span>not significant</li>'
+    )
+    perm_key = (
+        '<li><span class="key fill" aria-hidden="true"></span>permutation p</li>'
+        f'<li><span class="key dia" aria-hidden="true"></span>{corr}-corrected</li>'
+    )
+    return f"""<section aria-labelledby="h-{scope}">
+<h2 id="h-{scope}">{E(title)}</h2>
+<p>{E(blurb)}</p>
+{_tiles(part, fanbases)}
+<p>{n_sig} of {n_tests} corrected tests clear q &lt; {snap["alpha"]:g}.</p>
+<figure>
+{_legend(fanbases, sig_key)}
+<div class="fig-scroll">{forest_svg(part, f"forest-{scope}")}</div>
+<figcaption>Posterior mean and {snap["ci_level"]:.0%} credible interval of each effect. Metrics
+are oriented so that right is always better (fewer errors, lower ERA).</figcaption>
+</figure>
+<figure>
+{_legend(fanbases, perm_key)}
+<div class="fig-scroll">{perm_svg(part, f"perm-{scope}")}</div>
+<figcaption>Permutation p for each effect; the diamond is the value after {corr} correction
+within its family. Left of the dashed line is significant.</figcaption>
+</figure>
+<details><summary>All numbers (data table)</summary>{_table(part, fanbases)}</details>
+</section>"""
+
+
+NULL_TEXT = {
+    "freedman-lane": (
+        "Freedman-Lane permutation: within each player, the part of sentiment not explained by "
+        "his recent performance is shuffled across his weeks and the model is refit. Fans "
+        "reacting to last week's results is kept in the null, so the test asks whether sentiment "
+        "adds anything beyond that. Two-sided p, centered on the null median."
+    ),
+    "shuffle": (
+        "Within-player permutation of sentiment across weeks, model refit each time; two-sided p."
+    ),
+}
+
+
+def _render_v2(snap: dict) -> str:
+    shown = [sec for sec in snap["sections"] if sec["scope"] not in DATA_ONLY_SCOPES]
+    rows = [r for sec in shown for r in sec["rows"]]
+    c = snap["confirmatory"]
+    prelim = snap["status"] == "preliminary"
+    if c is not None and not c["confirmed"]:
+        answer = (
+            "<strong>We find no evidence that they do.</strong> The one test registered in "
+            "advance was not confirmed, and no league-wide effect clears correction."
+        )
+    else:
+        answer = "The sections below give the effect for each group of fanbases."
+    banner = (
+        '<aside class="prelim" role="note" aria-label="Preliminary results">'
+        '<span class="badge">Preliminary</span>'
+        "<p><strong>Preliminary results.</strong> These numbers may change.</p></aside>"
+        if prelim
+        else ""
+    )
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Are the Fans Right?{" (preliminary)" if prelim else ""}</title>
+<meta name="description" content="Does fan sentiment predict next-week MLB performance? \
+Hierarchical Bayesian results for the {snap["season"]} season.">
+<style>{CSS}</style>
+</head>
+<body>
+<main>
+{banner}
+<p class="kicker">fansent &middot; {snap["season"]} season &middot; run {E(snap["run_id"])}</p>
+<h1>Are the fans always right?</h1>
+<p class="lede">When a fanbase is upbeat about a player one week, does that player actually play
+better the next week, beyond what his current form already predicts? {answer}</p>
+<p>Effects &#956; are in SD of next-week performance per SD of fan sentiment. Positive means
+optimism preceded better play.</p>
+{_confirm_block(c, snap["alpha"])}
+{"".join(_section_block(snap, sec) for sec in shown)}
+<section aria-labelledby="h-method">
+<h2 id="h-method">Method</h2>
+<dl>
+<dt>Question</dt><dd>Does fan sentiment about a player in week t predict his performance in
+week t+1, controlling for week-t performance and season-to-date form?</dd>
+<dt>Data</dt><dd>Public Reddit comments from team subreddits (each counts only its own team's
+players that week) and r/baseball, scored for sentiment toward the named player by a
+classifier trained for this project; weekly player stats from the public MLB Stats API. Only
+aggregate results are published; no text is shown or stored here.</dd>
+<dt>Model</dt><dd>Hierarchical regression per metric, fit by a Gibbs sampler written from
+scratch: each (fanbase, player) gets its own sentiment slope, drawn from a group-level mean
+&#956; that is the reported effect.</dd>
+<dt>Null</dt><dd>{NULL_TEXT[snap["null"]]} {snap["perm_b"]:,} refits per effect, so p cannot
+go below 1/{snap["perm_b"] + 1}.</dd>
+<dt>Corrections</dt><dd>Benjamini-Hochberg (and Holm) within separate families: per-metric
+tests together, the composite index on its own.</dd>
+</dl>
+</section>
+<section aria-labelledby="h-caveats">
+<h2 id="h-caveats">Caveats</h2>
+<ul>
+<li>One season. The two-team tests rest on few players
+({min(r["n_units"] for r in rows)} at the smallest), so their intervals are wide.</li>
+<li>Only the pre-registered test is confirmatory. Everything else on this page is
+exploratory.</li>
+<li>The same players appear under more than one fanbase, so rows are not independent.</li>
+<li>Sentiment is from an automatic classifier and name matching; both make errors.</li>
+<li>Weekly thresholds and composite weights are documented assumptions, not tuned values.</li>
+<li>Largest R-hat across these fits: {max(r["rhat_max"] for r in rows):.3f}.</li>
+</ul>
+</section>
+<footer>
+<p>Code, method and data contract: <a href="{REPO_URL}">github.com/SebastianFrazier26/\
+mlb-fan-sentiment</a> &middot;
+<a href="{REPO_URL}/blob/main/docs/results-2026-11.md">full results note</a>
+&middot; <a href="data.json">snapshot JSON</a> &middot; Apache-2.0. Snapshot
+{E(snap["created"])}.</p>
+</footer>
+</main>
+</body>
+</html>
+"""
+
+
 def render_html(snap: dict) -> str:
     validate_snapshot(snap)
+    if snap["schema_version"] == SCHEMA_V2:
+        return _render_v2(snap)
     fanbases = _fanbases(snap["rows"])
     n_tests = sum(not r["exploratory"] for r in snap["rows"])
     n_sig = sum(_sig(r, snap) for r in snap["rows"])

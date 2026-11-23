@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 256" width="860" height="256" role="img" aria-label="Pre-registered fielding test: not confirmed (one-sided p = 0.183)">
+<rect width="860" height="256" fill="#ffffff"/>
+<text x="20.0" y="30.0" text-anchor="start" font-size="17" font-weight="600" fill="#1b1f24" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Pre-registered fielding test: not confirmed (one-sided p = 0.183)</text>
+<line x1="250.0" x2="250.0" y1="52" y2="206" stroke="#d8dee6" stroke-width="1"/>
+<text x="250.0" y="226.0" text-anchor="middle" font-size="12" font-weight="400" fill="#5f6b7a" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">-0.40</text>
+<line x1="300.0" x2="300.0" y1="52" y2="206" stroke="#d8dee6" stroke-width="1"/>
+<text x="300.0" y="226.0" text-anchor="middle" font-size="12" font-weight="400" fill="#5f6b7a" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">-0.35</text>
+<line x1="350.0" x2="350.0" y1="52" y2="206" stroke="#d8dee6" stroke-width="1"/>
+<text x="350.0" y="226.0" text-anchor="middle" font-size="12" font-weight="400" fill="#5f6b7a" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">-0.30</text>
+<line x1="400.0" x2="400.0" y1="52" y2="206" stroke="#d8dee6" stroke-width="1"/>
+<text x="400.0" y="226.0" text-anchor="middle" font-size="12" font-weight="400" fill="#5f6b7a" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">-0.25</text>
+<line x1="450.0" x2="450.0" y1="52" y2="206" stroke="#d8dee6" stroke-width="1"/>
+<text x="450.0" y="226.0" text-anchor="middle" font-size="12" font-weight="400" fill="#5f6b7a" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">-0.20</text>
+<line x1="500.0" x2="500.0" y1="52" y2="206" stroke="#d8dee6" stroke-width="1"/>
+<text x="500.0" y="226.0" text-anchor="middle" font-size="12" font-weight="400" fill="#5f6b7a" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">-0.15</text>
+<line x1="550.0" x2="550.0" y1="52" y2="206" stroke="#d8dee6" stroke-width="1"/>
+<text x="550.0" y="226.0" text-anchor="middle" font-size="12" font-weight="400" fill="#5f6b7a" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">-0.10</text>
+<line x1="600.0" x2="600.0" y1="52" y2="206" stroke="#d8dee6" stroke-width="1"/>
+<text x="600.0" y="226.0" text-anchor="middle" font-size="12" font-weight="400" fill="#5f6b7a" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">-0.05</text>
+<line x1="650.0" x2="650.0" y1="52" y2="206" stroke="#1b1f24" stroke-width="1"/>
+<text x="650.0" y="226.0" text-anchor="middle" font-size="12" font-weight="400" fill="#5f6b7a" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">0</text>
+<line x1="700.0" x2="700.0" y1="52" y2="206" stroke="#d8dee6" stroke-width="1"/>
+<text x="700.0" y="226.0" text-anchor="middle" font-size="12" font-weight="400" fill="#5f6b7a" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">+0.05</text>
+<text x="216.0" y="82.0" text-anchor="end" font-size="14" font-weight="400" fill="#1b1f24" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Two teams: Errors, r/CHICubs</text>
+<line x1="248.9" x2="658.8" y1="77.0" y2="77.0" stroke="#1b1f24" stroke-width="2.5" stroke-linecap="round"/>
+<circle cx="456.6" cy="77.0" r="5" fill="#1b1f24"/>
+<text x="724.0" y="82.0" text-anchor="start" font-size="12" font-weight="400" fill="#1b1f24" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">-0.193  [-0.401, +0.009]</text>
+<text x="216.0" y="108.0" text-anchor="end" font-size="14" font-weight="400" fill="#1b1f24" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Two teams: Errors, r/baseball</text>
+<line x1="317.6" x2="611.6" y1="103.0" y2="103.0" stroke="#1b1f24" stroke-width="2.5" stroke-linecap="round"/>
+<circle cx="468.3" cy="103.0" r="5" fill="#1b1f24"/>
+<text x="724.0" y="108.0" text-anchor="start" font-size="12" font-weight="400" fill="#1b1f24" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">-0.182  [-0.332, -0.038]</text>
+<text x="216.0" y="134.0" text-anchor="end" font-size="14" font-weight="400" fill="#1b1f24" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Two teams: Fielding %, r/CHICubs</text>
+<line x1="340.6" x2="646.7" y1="129.0" y2="129.0" stroke="#1b1f24" stroke-width="2.5" stroke-linecap="round"/>
+<circle cx="498.2" cy="129.0" r="5" fill="#1b1f24"/>
+<text x="724.0" y="134.0" text-anchor="start" font-size="12" font-weight="400" fill="#1b1f24" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">-0.152  [-0.309, -0.003]</text>
+<text x="216.0" y="160.0" text-anchor="end" font-size="14" font-weight="400" fill="#1b1f24" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Two teams: Fielding %, r/baseball</text>
+<line x1="409.5" x2="652.8" y1="155.0" y2="155.0" stroke="#1b1f24" stroke-width="2.5" stroke-linecap="round"/>
+<circle cx="532.1" cy="155.0" r="5" fill="#1b1f24"/>
+<text x="724.0" y="160.0" text-anchor="start" font-size="12" font-weight="400" fill="#1b1f24" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">-0.118  [-0.240, +0.003]</text>
+<text x="216.0" y="186.0" text-anchor="end" font-size="14" font-weight="400" fill="#1b1f24" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Rest of league (pre-registered)</text>
+<line x1="628.4" x2="667.2" y1="181.0" y2="181.0" stroke="#b9553a" stroke-width="2.5" stroke-linecap="round"/>
+<circle cx="647.7" cy="181.0" r="5" fill="#b9553a"/>
+<text x="724.0" y="186.0" text-anchor="start" font-size="12" font-weight="400" fill="#1b1f24" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">-0.002  [-0.022, +0.017]</text>
+<text x="20.0" y="248.0" text-anchor="start" font-size="12" font-weight="400" fill="#5f6b7a" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Effect of fan sentiment on next-week fielding, sd per sd, with 95% credible intervals. Negative = worse fielding.</text>
+</svg>
