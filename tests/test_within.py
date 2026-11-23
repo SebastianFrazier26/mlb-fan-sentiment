@@ -141,3 +141,13 @@ def test_beta_conditional_generic_in_column_count():
     )
     np.testing.assert_allclose(draws.mean(0), mean, atol=5e-3)
     np.testing.assert_allclose(np.cov(draws.T), cov, atol=5e-3)
+
+
+def test_mu_minus_null_removes_the_between_unit_share_of_pooled_mu():
+    panel = make_panel(within=0.0, between=0.5, seed=3)
+    row = fit_mu(panel, "pooled", perm_b=60)
+    assert row["mu_minus_null"] == pytest.approx(row["mu_mean"] - row["null_mean"])
+    # No within-unit effect was planted: the between-unit association pulls the null off 0, and
+    # once that is subtracted the pooled mu is within its own posterior noise of 0.
+    assert row["null_mean"] > 0.03
+    assert abs(row["mu_minus_null"]) < (row["ci_high"] - row["ci_low"]) / 2

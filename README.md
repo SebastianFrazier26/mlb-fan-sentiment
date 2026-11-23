@@ -8,11 +8,34 @@ week *t+1*, beyond what week *t* performance (and season-to-date form) already p
 Fanbases compared: all 30 team subreddits, r/baseball (neutral baseline), and `news` (GDELT
 headlines) — each judged only on the tracked players it talks about.
 
-**Results site:** <https://sebastianfrazier26.github.io/mlb-fan-sentiment/> (live once GitHub
-Pages is enabled; see [Results site](#results-site)).
+**Results site:** <https://sebastianfrazier26.github.io/mlb-fan-sentiment/> (see
+[Results site](#results-site)).
 
-Fanbases compared: r/CHICubs, r/redsox, r/baseball (neutral baseline), and
-`news` (GDELT media tone) — each judged only on the tracked players it talks about.
+## Result (2026 season)
+
+**No.** Across the 2026 regular season we find no evidence that fan sentiment about a player
+predicts his next-week performance beyond what his recent performance already predicts.
+
+- **First pass, two teams.** On Cubs and Red Sox players the analysis turned up one unplanned
+  signal: upbeat weeks came before *worse* fielding (errors, fielding %).
+- **Pre-registered test, rest of the league.** We wrote down one test of that signal before
+  looking at any other team ([`docs/preregistration.md`](docs/preregistration.md)) and ran it
+  once on 651 fanbase-player pairs and 11,818 player-weeks. Not confirmed: pooled effect
+  -0.002 sd per sd of sentiment, 95% CrI [-0.022, +0.017], one-sided p 0.183.
+- **Everything else, exploratory.** No league-wide metric (OPS, AVG, ERA, WHIP, fielding,
+  composite, OAA) clears correction, and none of 218 per-fanbase cells has q < 0.10. The
+  pooled league fit could detect effects of about 0.03 sd per sd (see [Power](#power)), so the
+  null is informative at that size.
+- **What is left of the two-team signal.** Under the corrected permutation null it is
+  borderline in the Cubs and Red Sox data (q 0.05 to 0.09) and appears nowhere else. We read
+  it as unconfirmed.
+
+Full numbers, the permutation-null bias found along the way, and one correction to an earlier
+version of the write-up: [`docs/results-2026-11.md`](docs/results-2026-11.md). Everything here
+is one season of observational data; the limits are listed in that note.
+
+**Status (2026-11-22):** the 2026 analysis is finished. The code is kept runnable for a future
+season; a new season's confirmatory claim would need its own pre-registration.
 
 ## Setup
 
@@ -165,6 +188,18 @@ Per metric (OPS, AVG, ERA, WHIP, FLD_PCT, ERRORS, CS_PCT, and a COMPOSITE index)
    `perm_p = (1 + #{|null - c| >= |obs - c|}) / (1 + B)` with `c` = null median;
    `perm_p_less` / `perm_p_greater` compare obs with the null as is. Seeded and independent of
    worker count.
+
+   **Reading the pooled `mu_k` (2026-11-22).** Do not read the pooled `mu_mean` against zero.
+   The Freedman-Lane null keeps each unit's mean sentiment and the part of sentiment explained
+   by the controls, and the pooled model's `mu_k` absorbs some of both, so the null is centered
+   on that share, not on 0. Output column `null_mean` is that center and `mu_minus_null` =
+   `mu_mean - null_mean` is what is left for the within-player, beyond-controls part. The offset
+   is largest where most of the sentiment variance is between players: league OAA (monthly,
+   about 4 points per player) has `null_mean` +0.028, against +0.008 or less for the weekly
+   metrics. The p-values already compare `mu` with the null's own distribution and need no
+   adjustment. `mu_minus_null` is a reading aid on the pooled scale, not a separate estimator:
+   it has no interval of its own, and nothing is decided on it (`confirm` does not use it).
+   For a within-player estimate with an interval, use `--estimator mundlak`.
 
    **Within-player estimator (`--estimator mundlak`, opt-in, exploratory).** The default
    `pooled` model multiplies *raw* sentiment by `gamma_unit` while the unit intercepts are

@@ -67,6 +67,7 @@ FANBASE_COLS = [
 ]
 OPTIONAL_COLS = [
     "null_mean",
+    "mu_minus_null",
     "supp_perm_p_less",
     "supp_perm_p",
     "supp_null_mean",
@@ -279,7 +280,7 @@ def format_table(fb: pd.DataFrame, correction: str, alpha: float) -> str:
         t[c] = t[c].map("{:+.3f}".format)
     for c in ("p_pos", "perm_p", "perm_p_less", "perm_p_greater", "q_bh", "p_holm", "rhat_max"):
         t[c] = t[c].map("{:.3f}".format).replace("nan", "NA")
-    for c in ("null_mean", "beta_between"):
+    for c in ("null_mean", "mu_minus_null", "beta_between"):
         if c in t:
             t[c] = t[c].map("{:+.3f}".format)
     blocks = []
