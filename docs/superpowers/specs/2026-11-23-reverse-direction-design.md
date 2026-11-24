@@ -231,8 +231,7 @@ best?
   team-season strata where possible, B = 999. One family of two tests (OI, dL), BH.
 - **Knows-ball score: skill vs luck is primary, overreaction secondary (owner decision
   2026-11-23, Q2).** `C_k = -(2 z(dL_k) + z(OI_k)) / 3` per posterior draw (z over
-  fanbases within the draw). The 2:1 weight is this draft's reading of "primary, not
-  equal" and needs owner sign-off before the pre-registration. Report posterior median rank, 80% rank interval, and tiers: top tier =
+  fanbases within the draw). The 2:1 weight was confirmed by the owner on 2026-11-23. Report posterior median rank, 80% rank interval, and tiers: top tier =
   P(rank in top 10) >= 0.8, bottom tier = P(rank in bottom 10) >= 0.8, everyone else middle.
 - **Classifier reliability**: sentiment measurement error enters in two ways. Classical
   noise in the outcome adds variance but no bias; it is in the SEs. A classifier that
@@ -398,7 +397,8 @@ run scripts per season.
 - Q1: every confirmatory claim must replicate in 2023, 2024 and 2025 individually; no
   pooled test.
 - Q2: skill vs luck (dL) is primary in the knows-ball score, overreaction secondary; not
-  equal weight (2:1 in this draft, pending sign-off).
+  equal weight. Follow-up 2026-11-23: owner confirmed the 2:1 weighting,
+  `C_k = -(2 z(dL_k) + z(OI_k)) / 3`.
 - Q3: a small random sample of backfilled raw comment text may be read for alias
   discovery, contained and logged as in item 3a; disclosed deviation.
 - Q4: OI controls for the team result; uncontrolled OI kept as secondary (F1s).
@@ -409,4 +409,4 @@ run scripts per season.
 
 ## Open questions
 
-- The 2:1 weight in the knows-ball score (Q2 follow-up).
+None at this gate.
