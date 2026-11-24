@@ -279,6 +279,39 @@ def main(argv: list[str] | None = None) -> None:
         help="Drop comments before the team's first pitch that fan-day (needs schedule.csv)",
     )
 
+    p = sub.add_parser(
+        "skill-luck", help="S2 reverse-direction study: fan weight on skill vs luck components"
+    )
+    p.add_argument("--season", type=int, default=2026)
+    p.add_argument("--prereg", help="Frozen pre-registration file (required off 2026)")
+    p.add_argument("--boot", type=int, default=199)
+    p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--out", help="Output dir (default: <data-dir>/runs/<date>-skill-luck)")
+
+    p = sub.add_parser(
+        "fanbases", help="S3: fanbase heterogeneity tests, partial pooling, knows-ball ranks"
+    )
+    p.add_argument("--season", type=int, default=2026)
+    p.add_argument("--prereg", help="Frozen pre-registration file (required off 2026)")
+    p.add_argument("--perm", type=int, default=999, help="Permutations per heterogeneity test")
+    p.add_argument("--boot", type=int, default=199, help="Bootstrap draws for per-fanbase SEs")
+    p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--out", help="Output dir (default: <data-dir>/runs/<date>-fanbases)")
+
+    for name, helptext in (
+        ("homers", "S4: team-sub fans vs r/baseball on the same player-weeks"),
+        ("context", "S5: reaction by team context (win, win pct, new to team, rookie)"),
+        ("trades", "S6: traded players, old vs new fanbase"),
+    ):
+        p = sub.add_parser(name, help=helptext)
+        p.add_argument("--season", type=int, default=2026)
+        p.add_argument("--prereg", help="Frozen pre-registration file (required off 2026)")
+        p.add_argument("--out", required=True, help="Output dir")
+        if name == "homers":
+            p.add_argument("--s1-dir", required=True, help="fansent react output dir")
+            p.add_argument("--s2-dir", required=True, help="fansent skill-luck output dir")
+            p.add_argument("--boot", type=int, default=199)
+
     p = sub.add_parser("schedule", help="Fetch the season's final games -> schedule.csv")
     p.add_argument("--season", type=int, default=2026)
 
@@ -523,6 +556,43 @@ def main(argv: list[str] | None = None) -> None:
             Path(args.out) if args.out else None,
             args.drop_pregame,
         )
+        print(res.to_string(index=False))
+    elif args.command == "skill-luck":
+        from . import skill_luck
+
+        res = skill_luck.run(
+            data_dir,
+            args.season,
+            Path(args.prereg) if args.prereg else None,
+            args.boot,
+            args.seed,
+            Path(args.out) if args.out else None,
+        )
+        print(res.to_string(index=False))
+    elif args.command == "fanbases":
+        from . import fanbase_rank
+
+        res = fanbase_rank.run(
+            data_dir,
+            args.season,
+            Path(args.prereg) if args.prereg else None,
+            args.perm,
+            args.boot,
+            args.seed,
+            Path(args.out) if args.out else None,
+        )
+        print(res.to_string(index=False))
+    elif args.command in ("homers", "context", "trades"):
+        import importlib
+
+        mod = importlib.import_module(f"fansent.{args.command}")
+        prereg = Path(args.prereg) if args.prereg else None
+        if args.command == "homers":
+            res = mod.run(
+                data_dir, args.season, prereg, args.s1_dir, args.s2_dir, args.out, args.boot
+            )
+        else:
+            res = mod.run(data_dir, args.season, prereg, args.out)
         print(res.to_string(index=False))
     elif args.command == "schedule":
         from . import schedule
