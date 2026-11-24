@@ -12,6 +12,10 @@
   mu must be read against the center of its permutation null, which is off zero where sentiment
   varies mostly between players (league OAA: +0.028). README method section and
   `docs/results-2026-11.md` explain how to read it. `confirm` is unchanged.
+- GitHub Pages site retired: `.github/workflows/pages.yml` is removed and the README links to
+  the results post at <https://sebastianfrazier.com/blog/fan-sentiment/> instead. The static
+  results are the README figures; `fansent site` stays as a local preview. Repo owner: also
+  disable Pages in the repo settings to take the old page down.
 - README shows the results as three static figures (`docs/img/*.svg`), written by the new
   `fansent figures` from the committed snapshot. The snapshot gains a data-only scope,
   `league_fanbases`: the 218 per-fanbase aggregate rows, validated like every other row and not
