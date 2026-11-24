@@ -262,6 +262,19 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--seed", type=int, default=0)
 
     p = sub.add_parser(
+        "react",
+        help="S1 reverse-direction study: fan reaction / overreaction to game results "
+        "(exploratory 2026; other seasons need --prereg)",
+    )
+    p.add_argument("--season", type=int, default=2026)
+    p.add_argument("--prereg", help="Frozen pre-registration file (required off 2026)")
+    p.add_argument("--lags", type=int, default=7, help="Daily lags 0..L")
+    p.add_argument("--cutoff-hour", type=int, default=5, help="Local hour a fan-day starts")
+    p.add_argument("--boot", type=int, default=199, help="Player-block bootstrap draws for OI")
+    p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--out", help="Output dir (default: <data-dir>/runs/<date>-react)")
+
+    p = sub.add_parser(
         "power",
         help="Simulated power / minimum detectable effect of the fanbase test",
     )
@@ -488,6 +501,20 @@ def main(argv: list[str] | None = None) -> None:
             args.league_fanbases,
             Path(args.out_dir) if args.out_dir else None,
         )
+    elif args.command == "react":
+        from . import reaction
+
+        res = reaction.run(
+            data_dir,
+            args.season,
+            Path(args.prereg) if args.prereg else None,
+            args.lags,
+            args.cutoff_hour,
+            args.boot,
+            args.seed,
+            Path(args.out) if args.out else None,
+        )
+        print(res.to_string(index=False))
     elif args.command == "confirm":
         from . import confirm
 

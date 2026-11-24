@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-11-23
+
+- Reverse-direction study started (design: `docs/superpowers/specs/2026-11-23-reverse-direction-design.md`).
+  2026 is exploratory; backfilled 2023-2025 seasons are confirmatory and stay closed until a
+  frozen pre-registration exists.
+- `fansent react` (S1, exploratory): fan-day sentiment panel aligned to each fanbase's local
+  time (05:00 cutoff, `team_timezones.csv`), per-game value in runs above average from the game
+  logs, empirical-Bayes talent update vs raw surprise, daily and weekly distributed lags and the
+  overreaction index. Refuses any season other than 2026 without `--prereg` pointing at a file
+  marked `Status: FROZEN`.
+
 ## 2026-11-22
 
 - `docs/results-2026-11.md`: the unconverged ERA fit was the pooled-estimator one only. Re-run

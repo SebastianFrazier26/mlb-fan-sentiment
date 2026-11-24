@@ -151,14 +151,16 @@ talent signal or to the raw result?
   Separate fits for hitters and pitchers; v standardized within group.
 - **S1b weekly distributed lag**: fan-week mean sentiment on weekly value at lags 0..3,
   same structure. Estimand `B_3`.
-- **S1c rational-fan overreaction index (primary)**: per player-game, `dy_g` = mean
-  sentiment on the game's fan-day and the next one minus mean sentiment over the 7 fan-days
-  before it (the change, so unit levels cancel). Model `dy_g = alpha u_g + beta s_g + e`.
-  A rational evaluative fan has `beta = 0`. **OI = beta / (beta + alpha / (N_med + k))**, the
-  share of the response to a one-run surprise at median season-to-date exposure that the
-  talent update does not justify: 0 = rational, 1 = pure recency. Identification comes from
-  how N (and so the weight of a game) varies over the season and between players. Block
-  bootstrap CI.
+- **S1c rational-fan overreaction index (primary)**: the S1a model with the game value
+  replaced by its two parts, the talent update `u` and the raw surprise `s`, at lags 0..7:
+  `y_{j,d} = a_j + sum_l (alpha_l u_{i,d-l} + beta_l s_{i,d-l}) + played/dow + e`. With
+  `B_u = sum alpha_l`, `B_s = sum beta_l`, a rational evaluative fan has `B_s = 0`.
+  **OI = B_s / (B_s + B_u / (N_med + k))**, the share of the response to a one-run surprise
+  at median pre-game exposure that the talent update does not justify: 0 = rational, 1 =
+  pure recency. Identification comes from how N (and so the weight of a game) varies over
+  the season and between players. The test of OI = 0 is the CR1 test of B_s = 0; the OI
+  interval is a player-block bootstrap. (An earlier draft used a pre/post change score;
+  the fixed-effects form was chosen so S1a and S1c share one model.)
   Caveat stated with every result: part of sentiment is hedonic (enjoying a win), not an
   estimate of talent; beta > 0 then is not irrational. S2 and S4 help separate the two.
 

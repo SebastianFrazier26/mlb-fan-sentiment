@@ -23,6 +23,7 @@ progress; read at session start, update on meaningful deltas).
 - `src/fansent/confirm.py` — `fansent confirm`: the pre-registered confirmatory test (`docs/preregistration.md`), spec hard-coded (registered shuffle null; Freedman-Lane only as supplementary fields); never run on league data for exploration
 - `src/fansent/hierarchical.py` — Gibbs-sampled hierarchical model (`fit` -> `FitResult`); `diagnostics.py` (split-R-hat, bulk ESS); `model_data.py` (panel -> arrays)
 - `src/fansent/power.py` — `fansent power`: simulated power curves and MDE of the fanbase test
+- `src/fansent/daypanel.py`, `reaction.py` — reverse-direction study (spec `docs/superpowers/specs/2026-11-23-reverse-direction-design.md`): fan-day panel with local-time alignment (`team_timezones.csv`), per-game runs-above-average, EB talent update/surprise; `fansent react` = S1 distributed lags + overreaction index. 2026 only unless `--prereg` is a FROZEN file; backfilled seasons (`data/seasons/<YYYY>/`) must not be analysed before that
 - `src/fansent/names.py`, `util.py` — name matching, paths, CSV I/O (also imported by `fansent-collect`)
 - `src/fansent/label.py` — `fansent label`: localhost-only labeling page for eval CSVs (data stays local, gitignored)
 - `src/fansent/site.py` — `fansent snapshot` (run -> aggregate-only `results/published/<run-id>.json`, schema-validated; `--section SCOPE=RUN_DIR` + `--confirm` = schema 2, several runs and the pre-registered result on one page) and `fansent site` (snapshot -> static `site/`, gitignored); only aggregate numbers may ever be published
