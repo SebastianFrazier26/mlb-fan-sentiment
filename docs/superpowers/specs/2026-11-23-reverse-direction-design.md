@@ -277,6 +277,7 @@ All on 2026 only. BH within family; Holm reported.
 | F4 homers | A12-A15 | S4 level, reaction, OI and luck gaps |
 | F5 context | A16-A20 | S5 five interactions |
 | F6 trades | A21-A22 | S6 honeymoon gap, early-slope ratio |
+| Alignment check (added 2026-11-23 after the first S1 smoke run; diagnostic, no test) | R6 | lead placebo: value of the next fan-day's game added to S1a; must be ~0 |
 | Robustness (no tests) | R1-R5 | fan-day cutoff 04:00 / 06:00; explicit mentions only (no reply_inherited); VADER instead of classifier; xwRAA instead of wRAA as v; min mentions 2 / 5 |
 
 ## Code plan

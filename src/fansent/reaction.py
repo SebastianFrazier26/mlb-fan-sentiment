@@ -352,6 +352,7 @@ def run(
                     "N_med": n_med[grp],
                 },
             )
+            rows[-1]["z"] = b_s / bs_se
             rows[-1]["p_test"] = float(2 * norm.sf(abs(b_s / bs_se)))
     res_df = pd.DataFrame(rows)
     p = res_df["p_test"].to_numpy(float)
