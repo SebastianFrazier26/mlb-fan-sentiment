@@ -5,12 +5,12 @@ needs, and what exists already.
 
 ## Hosted URL
 
-- Planned (owner decision 2026-11-22): an animated post at `sebastianfrazier.com/blog/`, built
-  in the portfolio repository from an aggregate-only snapshot of these results.
+- Live: an animated post at <https://sebastianfrazier.com/blog/fan-sentiment/>, built in the
+  portfolio repository from an aggregate-only snapshot of these results.
 - The GitHub Pages page is retired; the static results are the figures in the README.
 - Repository: <https://github.com/SebastianFrazier26/mlb-fan-sentiment>.
 
-## Screenshots to take (once the post is live)
+## Screenshots to take
 
 1. The opener and the "not confirmed" reveal. This is the card image.
 2. The whole-league chart: every interval sitting on zero.

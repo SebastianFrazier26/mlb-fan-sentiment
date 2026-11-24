@@ -8,6 +8,9 @@ week *t+1*, beyond what week *t* performance (and season-to-date form) already p
 Fanbases compared: all 30 team subreddits, r/baseball (neutral baseline), and `news` (GDELT
 headlines) — each judged only on the tracked players it talks about.
 
+**Results post:** <https://sebastianfrazier.com/blog/fan-sentiment/> (the static version is
+below).
+
 ## Result (2026 season)
 
 **No.** Across the 2026 regular season we find no evidence that fan sentiment about a player
@@ -394,8 +397,9 @@ and, with `--confirm`, nine summary numbers of the pre-registered test picked ou
 `confirm_result.json`. `fansent snapshot <run-dir>` without `--section` still writes the older
 one-run format.
 
-The GitHub Pages site was retired on 2026-11-22: the static results are the figures in this
-README, and `fansent site` remains only as a local preview of a snapshot.
+The GitHub Pages site was retired on 2026-11-22. The results now live in the
+[blog post](https://sebastianfrazier.com/blog/fan-sentiment/) and, as static figures, in this
+README; `fansent site` remains only as a local preview of a snapshot.
 
 ## Notes & caveats
 
