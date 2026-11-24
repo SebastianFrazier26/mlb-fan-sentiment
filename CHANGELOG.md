@@ -18,6 +18,12 @@
 - `fansent.skill_luck` (S2): weekly skill/luck components from game logs and Statcast PA rows,
   fan slopes vs a rest-of-season persistence benchmark, luck-overweight `dL` with a
   player-block bootstrap, split-half reliability of each component.
+- `fansent fanbases` (S3): per-fanbase luck overweight (primary) and overreaction (secondary),
+  permutation heterogeneity tests, normal-normal partial pooling (own Gibbs sampler),
+  knows-ball score with 2:1 weights, posterior ranks and tiers, per-fanbase split-half
+  reliability flag, and a parametric power function for the per-season replication rule.
+- `fansent homers` (S4), `fansent context` (S5), `fansent trades` (S6). S5 leaves out the
+  games-back interaction (needs daily standings).
 
 ## 2026-11-22
 

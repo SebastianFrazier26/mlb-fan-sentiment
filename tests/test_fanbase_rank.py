@@ -92,3 +92,13 @@ def test_split_half_reliability_high_for_signal_low_for_noise():
                     )
     rel = fr.split_half_reliability(pd.DataFrame(rows))
     assert rel["sig"] > 0.8 and abs(rel["noise"]) < 0.3
+
+
+def test_het_power_bounds():
+    se = np.full(30, 0.1)
+    n = np.ones(30)
+    none = fr.het_power(np.zeros(30), se, n, n_sim=2000)
+    assert none["power_one_season"] == pytest.approx(0.05, abs=0.02)
+    big = fr.het_power(np.linspace(-1, 1, 30), se, n, n_sim=2000)
+    assert big["power_one_season"] > 0.99
+    assert big["power_all_seasons"] == pytest.approx(big["power_one_season"] ** 3)

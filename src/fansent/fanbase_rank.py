@@ -336,3 +336,32 @@ def run(
     pd.concat(est_tables).to_csv(out_dir / "s3_fanbase_estimates.csv", index=False)
     pd.concat([ranks, ranks_dl.assign(index="dL")]).to_csv(out_dir / "s3_ranks.csv", index=False)
     return res
+
+
+def het_power(
+    theta: np.ndarray,
+    se: np.ndarray,
+    n_units: np.ndarray,
+    *,
+    alpha: float = 0.05,
+    n_sim: int = 4000,
+    seasons: int = 3,
+    seed: int = 0,
+) -> dict[str, float]:
+    """Parametric power of the heterogeneity test in one season and in all `seasons`
+    independently (the per-season replication rule). est_k ~ N(theta_k, se_k^2); the null
+    draws use theta_k = their n-weighted mean. The permutation null is approximated by this
+    parametric one, which assumes the bootstrap SEs are right."""
+    rng = np.random.default_rng(seed)
+    theta, se, w = (np.asarray(x, float) for x in (theta, se, n_units))
+    m = float((w * theta).sum() / w.sum())
+
+    def stat(est):
+        mean = (est * w).sum(axis=1, keepdims=True) / w.sum()
+        return (w * (est - mean) ** 2).sum(axis=1)
+
+    null = stat(m + rng.normal(0, se, (n_sim, len(se))))
+    crit = float(np.quantile(null, 1 - alpha))
+    alt = stat(theta + rng.normal(0, se, (n_sim, len(se))))
+    p1 = float((alt > crit).mean())
+    return {"power_one_season": p1, "power_all_seasons": p1**seasons, "crit": crit}
