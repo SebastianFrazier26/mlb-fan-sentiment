@@ -273,9 +273,10 @@ week and in r/baseball. Differencing within the pair removes the player-week's n
 Q: Does reaction depend on the team's situation?
 
 Interactions with the S1a lag-0..1 value response: team won the game; team season win%
-(standardized, as of that day); games back from a playoff spot (bucketed: in, within 5,
-out); player new to the team this season (not on its week-1 roster); rookie (debut this
-season or rookie status from the people endpoint). One family of five interactions.
+(standardized, as of that day); player new to the team this season (not on its week-1
+roster); rookie (MLB debut this season, people endpoint). One family of four interactions.
+Games back from a playoff spot was in the first draft and is dropped: it needs daily
+standings by division and is not approximated.
 
 ### S6: trades
 
@@ -309,11 +310,64 @@ All on 2026 only. BH within family; Holm reported.
 | F3 | A10 | heterogeneity test dL_k |
 | F3d | A11 | shrunk per-fanbase indices, combined score, tiers (descriptive only) |
 | F4 homers | A12-A15 | S4 level, reaction, OI and luck gaps |
-| F5 context | A16-A20 | S5 five interactions |
+| F5 context | A16-A19 | S5 four interactions (A20 games-back dropped) |
 | F6 trades | A21-A22 | S6 honeymoon gap, early-slope ratio |
 | Alignment check (added 2026-11-23 after the first S1 smoke run; diagnostic, no test) | R6 | lead placebo: value of the next fan-day's game added to S1a; must be ~0 |
 | Robustness (no tests) | R7 | drop comments before the team's first pitch that fan-day |
 | Robustness (no tests) | R1-R5 | fan-day cutoff 04:00 / 06:00; explicit mentions only (no reply_inherited); VADER instead of classifier; xwRAA instead of wRAA as v; min mentions 2 / 5 |
+
+## Power under per-season replication
+
+Computed 2026-11-23 from the 2026 exploratory estimates
+(`data/league_v2/runs/2026-11-23-power-per-season.csv`, local). Method: each test's 2026 z
+taken as the expected z in a backfill season of the same size, two-sided alpha 0.05 per
+season (BH ignored, which flatters power slightly), power in one season `p1 = Phi(|z| -
+1.96)`, and power to pass in all three seasons `p1^3`. Shown at the 2026 effect size and at
+0.75x and 0.5x, because first-look estimates tend to be too large. Backfill seasons may
+have more or fewer mentions than 2026; the table is redone from QA mention counts before the
+pre-registration (counts only, allowed under item 2).
+
+| Test | 2026 z | all 3 seasons, 1.0x | 0.75x | 0.5x |
+|---|---|---|---|---|
+| S1a/S1b reaction (A1-A3) | 17-37 | 1.00 | 1.00 | 1.00 |
+| S1c OI team subs, hitters (A4) | 5.4 | 1.00 | 0.95 | 0.47 |
+| S1c OI team subs, pitchers (A4) | 3.5 | 0.83 | 0.42 | 0.07 |
+| S1c OI r/baseball (A5) | 2.6-2.8 | 0.38-0.51 | 0.11-0.17 | ~0.02 |
+| S2 dL hitters (A6) | 0.6 | ~0 | ~0 | ~0 |
+| S2 dL pitchers (A7) | 3.5 | 0.82 | 0.41 | 0.07 |
+| S4 level and reaction gaps (A12, A13) | 4.0-6.3 | 0.94-1.00 | 0.62-0.99 | 0.14-0.69 |
+| S4 OI and luck gaps (A14, A15) | 0.3-1.0 | ~0 | ~0 | ~0 |
+| S5 interactions (A16-A19) | 0.1-8.9 | 0-1.00 | 0-1.00 | 0-0.98 |
+| S6 honeymoon (A21) | 2.7 | 0.45 | 0.14 | 0.02 |
+| S6 early slope (A22) | 5.1 | 1.00 | 0.91 | 0.37 |
+
+Reading: the basic reaction results and the team-sub overreaction for hitters will very
+likely replicate if real. Anything near z = 3 in 2026 has roughly even or worse odds of
+passing three times even if it is true, and the luck-overweight test for hitters, the S4
+OI/luck gaps and the weaker S5/S6 effects are effectively untestable under this rule.
+That is the price of the stricter rule and it is accepted: a "not confirmed" there means
+"not shown", not "absent".
+
+**S3 heterogeneity tests (the fanbase ranking).** From the 2026 S3 run
+(`data/league_v2/runs/2026-11-23-fanbases/`, local; 30 fanbases, player-block bootstrap SEs,
+parametric approximation of the permutation null via `fanbase_rank.het_power`). Power
+depends on the true between-fanbase SD omega relative to the per-fanbase SE:
+
+| omega (x median per-fanbase SE) | dL: 1 season | dL: all 3 | OI: 1 season | OI: all 3 |
+|---|---|---|---|---|
+| 0.5x | 0.21 | 0.01 | 0.10 | 0.00 |
+| 1.0x (dL 0.076, OI 0.50) | 0.89 | 0.70 | 0.41 | 0.07 |
+| 1.5x | 1.00 | 1.00 | 0.94 | 0.82 |
+
+In 2026 neither test comes near rejecting (dL p = 0.84, OI p = 0.95). The spread of the raw
+per-fanbase dL (SD 0.065) is smaller than a typical per-fanbase SE (0.076), and the pooled
+model puts omega for dL at about 0.03 (95% interval 0.004-0.06), roughly 0.4x the SE. If
+that is near the truth, the chance that the dL test passes in all three backfill seasons is
+about 1%, and the OI test's is lower. Add the rule that a tier must be the same in all three
+seasons (in 2026, 29 of 30 fanbases are "middle") and **S3 fanbase rankings are effectively
+unpublishable under per-season replication**. The expected publishable S3 outcome is "no
+detectable difference between fanbases", with omega's posterior as the upper bound. The
+rule stays as decided; this is written down now so that outcome is not a surprise later.
 
 ## Code plan
 
