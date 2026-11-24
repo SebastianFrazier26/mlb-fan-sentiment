@@ -22,7 +22,9 @@ def test_within_wls_matches_dummy_regression():
     assert plain.names[0] == "const" and len(plain.coef) == 3
 
 
-def _synthetic_panel(kind: str, seed: int = 0, n_lags: int = 1) -> tuple[pd.DataFrame, float]:
+def _synthetic_panel(
+    kind: str, seed: int = 0, n_lags: int = 1, win_effect: float = 0.0
+) -> tuple[pd.DataFrame, float]:
     """Unit-days where sentiment responds to the lag-0 talent update (rational) or to the raw
     surprise (recency). k = 50; exposure varies over the season, which identifies the split."""
     rng = np.random.default_rng(seed)
@@ -33,6 +35,7 @@ def _synthetic_panel(kind: str, seed: int = 0, n_lags: int = 1) -> tuple[pd.Data
         level = rng.normal()
         for d in range(60):
             s = rng.normal()
+            win = float(rng.random() < 1 / (1 + np.exp(-1.5 * s)))
             n = 4.0
             u = s / (n_pre + n + k)
             scale_mid = 100 + k
@@ -45,13 +48,14 @@ def _synthetic_panel(kind: str, seed: int = 0, n_lags: int = 1) -> tuple[pd.Data
                     "u_l0": u,
                     "s_l0": s,
                     "played_l0": 1.0,
-                    "sent": level + 0.2 * signal + rng.normal(0, 0.3),
+                    "team_win_l0": win,
+                    "sent": level + 0.2 * signal + win_effect * win + rng.normal(0, 0.3),
                     "n_mentions": 3,
                 }
             )
             n_pre += n
     df = pd.DataFrame(rows)
-    for col in ("u", "s", "played"):
+    for col in ("u", "s", "played", "team_win"):
         df[f"{col}_l1"] = df.groupby("player_id")[f"{col}_l0"].shift(1).fillna(0.0)
     return df, 100 + k
 
@@ -82,3 +86,13 @@ def test_season_guard(tmp_path):
         rx.require_open_season(2025, draft)
     draft.write_text("Status: FROZEN 2027-01-01T00:00Z\n")
     rx.require_open_season(2025, draft)
+
+
+def test_team_win_control_removes_hedonic_bias():
+    """Rational fans who also enjoy wins: player surprise correlates with the team winning, so
+    without the win control the hedonic part shows up as overreaction."""
+    panel, scale = _synthetic_panel("rational", seed=3, win_effect=0.3)
+    oi_ctrl, _, _ = rx.oi_from(rx.fit_overreaction(panel, 1, control_win=True), 1, scale)
+    oi_raw, _, _ = rx.oi_from(rx.fit_overreaction(panel, 1, control_win=False), 1, scale)
+    assert abs(oi_ctrl) < 0.15
+    assert oi_raw > abs(oi_ctrl) + 0.15

@@ -10,6 +10,14 @@
   logs, empirical-Bayes talent update vs raw surprise, daily and weekly distributed lags and the
   overreaction index. Refuses any season other than 2026 without `--prereg` pointing at a file
   marked `Status: FROZEN`.
+- Owner decisions folded into the design: per-season replication (no pooled test), skill vs
+  luck primary in the knows-ball score, the overreaction index controls for the team result
+  (uncontrolled version kept as a secondary family), a logged alias-discovery sample of
+  backfilled text as a disclosed deviation.
+- `fansent schedule` (final games with first-pitch times) and `fansent react --drop-pregame`.
+- `fansent.skill_luck` (S2): weekly skill/luck components from game logs and Statcast PA rows,
+  fan slopes vs a rest-of-season persistence benchmark, luck-overweight `dL` with a
+  player-block bootstrap, split-half reliability of each component.
 
 ## 2026-11-22
 

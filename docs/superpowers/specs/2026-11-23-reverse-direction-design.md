@@ -1,7 +1,7 @@
 # Reverse-direction study: how fans react to performance
 
-Status: DRAFT design, 2026-11-23. Not a pre-registration. Owner decisions that set the
-scope are recorded at the end; open questions are listed there too.
+Status: DRAFT design, 2026-11-23 (revised the same day after owner answers to Q1-Q5).
+Not a pre-registration. Owner decisions are recorded at the end.
 
 ## Why
 
@@ -27,21 +27,40 @@ The 2026 season has been looked at many times. It is **exploratory only** here. 
    because collection cannot be checked without them. Not allowed: reading the sentiment
    score column, joining sentiment to performance, plotting or summarizing sentiment, or
    tuning anything (classifier, relevance threshold, aliases, thresholds) on backfilled text.
-   The analysis code enforces this: `fansent.reaction` refuses any season other than 2026
+   One disclosed exception, the alias sample (item 3a). The analysis code enforces this: `fansent.reaction` refuses any season other than 2026
    unless it is given a pre-registration file whose status line reads `FROZEN`.
 3. **Frozen models.** The sentiment classifier and relevance model used on 2026
    (`models/clf_big.npz`, `models/relevance_league_weekly2.npz`) score the backfilled
-   seasons unchanged. Aliases for earlier rosters come from roster/public name data only,
-   never from reading backfilled mention text (see open question Q3).
+   seasons unchanged.
+
+3a. **Disclosed deviation: alias-discovery sample (owner decision 2026-11-23, Q3).** To
+   recover nicknames for players not on the curated 2026 alias list, a small uniform random
+   sample of raw backfilled comment bodies may be read for name/nickname discovery only.
+   Containment: (i) the sample is drawn by the private collector's `alias-sample` command
+   with a fixed seed, at most 2,000 comments per season; (ii) the sample file holds the
+   subreddit and the body only: no Reddit score, author, id or timestamp, and no sentiment
+   score exists for these seasons yet (scoring happens after the review), and no stats are
+   joined or shown; (iii) the review happens before the pre-registration is frozen and
+   before any backfilled season is scored; (iv) every draw is appended to
+   `data/seasons/alias_review_log.jsonl` (UTC time, season, seed, requested and returned
+   counts, number of source files and comments in the frame) and the pre-registration
+   copies that log; (v) the only output is new rows in `aliases.csv` with
+   `source=backfill_sample_<season>`. This breaks strict closed-season purity: whoever
+   reads the sample sees how fans in those seasons talk, though not how sentiment lines up
+   with performance. It is reported as a deviation in the pre-registration and the results.
 4. **Pre-registration.** After the 2026 exploration, `docs/preregistration-reverse.md` is
    written and frozen: hypotheses, exact estimands and models, data filters and thresholds,
    families, alpha, decision rules, which claims are publishable under which outcome, the
    code commit SHA, and a manifest (row counts + sha256) of each backfilled data dir. It is
    committed with `Status: FROZEN` and a UTC timestamp before the first confirmatory run.
    Pushing that commit gives it a public timestamp; that is the owner's call.
-5. **Confirmatory run.** Primary: the three seasons pooled (season as a stratum, units are
-   player x fanbase x season). Secondary: each season separately, reported as replication
-   counts, with no decision weight. Results are reported whichever way they come out.
+5. **Confirmatory run: every season replicates on its own (owner decision 2026-11-23,
+   Q1).** A confirmatory claim holds only if it passes its pre-registered test separately
+   in 2023, in 2024 and in 2025 (BH within its family inside each season, same alpha). There
+   is no pooled test. A pooled three-season estimate may be shown as a description, never
+   as the test. Results are reported whichever way they come out. Power under this rule is
+   in "Power under per-season replication" below; for small effects it is much lower than a
+   pooled test, and that is accepted.
 
 ## Data
 
@@ -87,10 +106,11 @@ comments use the mentioned player's team zone that week. Game dates from the Sta
 the local official date, so a game and its post-game discussion share a fan-day.
 Fan-weeks are Monday-Sunday over fan-days. Doubleheaders: the day's games are summed.
 
-Known limit: comments before first pitch on a game day land in the same fan-day as the
-game. They cannot react to it, so they attenuate the lag-0 response rather than bias it.
-Splitting at first pitch needs schedule start times (one Stats API request per season,
-cheap); deferred until lag 0 matters (see Q5).
+Comments before first pitch on a game day land in the same fan-day as the game. They
+cannot react to it, so they attenuate the lag-0 response rather than bias it. Schedule start
+times (`fansent schedule`, one Stats API request per season, final games only) let the
+robustness run R7 drop comments made before the player's team's first pitch that fan-day
+(`fansent react --drop-pregame`).
 
 ### Game value
 
@@ -153,7 +173,10 @@ talent signal or to the raw result?
   same structure. Estimand `B_3`.
 - **S1c rational-fan overreaction index (primary)**: the S1a model with the game value
   replaced by its two parts, the talent update `u` and the raw surprise `s`, at lags 0..7:
-  `y_{j,d} = a_j + sum_l (alpha_l u_{i,d-l} + beta_l s_{i,d-l}) + played/dow + e`. With
+  `y_{j,d} = a_j + sum_l (alpha_l u_{i,d-l} + beta_l s_{i,d-l} + gamma_l W_{i,d-l}) +
+  played/dow + e`, where `W` = the player's team won that game (owner decision
+  2026-11-23, Q4: the primary OI is the reaction to the player's own surprise net of the
+  team result). With
   `B_u = sum alpha_l`, `B_s = sum beta_l`, a rational evaluative fan has `B_s = 0`.
   **OI = B_s / (B_s + B_u / (N_med + k))**, the share of the response to a one-run surprise
   at median pre-game exposure that the talent update does not justify: 0 = rational, 1 =
@@ -161,16 +184,20 @@ talent signal or to the raw result?
   the season and between players. The test of OI = 0 is the CR1 test of B_s = 0; the OI
   interval is a player-block bootstrap. (An earlier draft used a pre/post change score;
   the fixed-effects form was chosen so S1a and S1c share one model.)
-  Caveat stated with every result: part of sentiment is hedonic (enjoying a win), not an
-  estimate of talent; beta > 0 then is not irrational. S2 and S4 help separate the two.
+  Secondary (own BH family F1s): the same OI without the team-won terms. The gap between
+  the two is the part of apparent overreaction that is enjoyment of the team winning.
+  Caveat stated with every result: some hedonic response to the player's own good game
+  remains after the win control, and beta > 0 then is not irrational. S2 helps separate
+  the two.
 
 ### S2: skill vs luck
 
 Q: Do fans respond to the parts of performance that persist (skill) or to the parts that
 don't (luck)?
 
-Components per fan-week, per player (rates over the week, shrunk to the player's season
-rate by EB so tiny samples don't dominate):
+Components per fan-week, per player (raw weekly rates; weeks under 10 PA / 12 batters
+faced are dropped and the unit fixed effect absorbs the player's level. An earlier draft
+shrank week rates by EB; dropped as unnecessary with the FE and the exposure floor):
 
 - Hitters, skill: K%, BB%, ISO (power), xwOBA. Luck: BABIP, wOBA - xwOBA.
 - Pitchers, skill: K%, BB%, HR/9 is mixed so FIP is the skill summary, xwOBA-against.
@@ -202,8 +229,10 @@ best?
 - **Heterogeneity test** per index: Cochran's Q of the per-fanbase estimates, null by
   permuting fanbase labels across player-units within player group (hitter/pitcher) and
   team-season strata where possible, B = 999. One family of two tests (OI, dL), BH.
-- **Combined score**: `C_k = -(z(OI_k) + z(dL_k)) / 2` per posterior draw (z over fanbases
-  within the draw). Report posterior median rank, 80% rank interval, and tiers: top tier =
+- **Knows-ball score: skill vs luck is primary, overreaction secondary (owner decision
+  2026-11-23, Q2).** `C_k = -(2 z(dL_k) + z(OI_k)) / 3` per posterior draw (z over
+  fanbases within the draw). The 2:1 weight is this draft's reading of "primary, not
+  equal" and needs owner sign-off before the pre-registration. Report posterior median rank, 80% rank interval, and tiers: top tier =
   P(rank in top 10) >= 0.8, bottom tier = P(rank in bottom 10) >= 0.8, everyone else middle.
 - **Classifier reliability**: sentiment measurement error enters in two ways. Classical
   noise in the outcome adds variance but no bias; it is in the SEs. A classifier that
@@ -217,9 +246,12 @@ best?
 
 **Publishable fanbase claims.** Rankings, tiers, "fanbase X knows ball / overreacts most",
 and any named per-fanbase index value are publishable **only if** the confirmatory
-heterogeneity test for that index rejects (BH q < 0.05 in the S3 family on the pooled
-2023-2025 data). The combined ranking needs both tests to reject; if only one does, only
-that index's ranking may be shown. If neither rejects, the publishable statement is "no
+heterogeneity test for that index rejects (BH q < 0.05 in the S3 family) **in each of 2023,
+2024 and 2025 separately**. The knows-ball score needs the dL test to replicate in all
+three seasons; if the OI test also replicates, the score is shown, otherwise only the dL
+ranking is. An OI-only ranking can be shown if only OI replicates, labeled secondary. A
+ranking also has to be stable: a tier assignment is published only for fanbases in the
+same tier in all three seasons. If neither rejects, the publishable statement is "no
 detectable difference between fanbases", with the posterior of omega as an upper bound, and
 per-fanbase numbers appear only as a pooled-shrinkage table labeled as indistinguishable.
 2026-only fanbase rankings are never published as findings.
@@ -254,8 +286,9 @@ Event-time weeks -4..+8. Outcomes: new-team fanbase sentiment level vs the playe
 baseline (r/baseball), new-fanbase reaction slope in weeks +1..+4 vs later, old-fanbase
 mentions after the trade (needs the `--all-teams` view). Estimands: honeymoon gap (weeks
 +1..+4 level minus r/baseball, performance-adjusted) and the early-slope ratio. Expected
-sample: a few dozen trades per season, so 2026 alone is descriptive; the confirmatory
-version pools three seasons.
+sample: a few dozen trades per season, so 2026 alone is descriptive. Under per-season
+replication S6 is almost certainly underpowered as a confirmatory test (see power notes);
+it stays in the pre-registration but its expected outcome is "not confirmed".
 
 ## Exploratory analysis list (2026), by family
 
@@ -268,6 +301,7 @@ All on 2026 only. BH within family; Holm reported.
 | F1 | A3 | S1b weekly DL, hitters and pitchers: B_3 |
 | F1 | A4 | S1c OI, team subs pooled (own-team units) |
 | F1 | A5 | S1c OI, r/baseball |
+| F1s secondary | A4u, A5u | S1c OI without the team-won control |
 | F2 skill/luck | A6 | S2 dL hitters |
 | F2 | A7 | S2 dL pitchers |
 | F2c components | A8 | each component slope b_c and w_c (descriptive, BH within) |
@@ -278,6 +312,7 @@ All on 2026 only. BH within family; Holm reported.
 | F5 context | A16-A20 | S5 five interactions |
 | F6 trades | A21-A22 | S6 honeymoon gap, early-slope ratio |
 | Alignment check (added 2026-11-23 after the first S1 smoke run; diagnostic, no test) | R6 | lead placebo: value of the next fan-day's game added to S1a; must be ~0 |
+| Robustness (no tests) | R7 | drop comments before the team's first pitch that fan-day |
 | Robustness (no tests) | R1-R5 | fan-day cutoff 04:00 / 06:00; explicit mentions only (no reply_inherited); VADER instead of classifier; xwRAA instead of wRAA as v; min mentions 2 / 5 |
 
 ## Code plan
@@ -289,12 +324,15 @@ Public repo (`feat/reverse-study`):
   in the season window per unit, with game flags), weekly aggregation.
 - `src/fansent/reaction.py`: within-unit WLS + CR1, distributed lags, EB talent/surprise,
   S1c OI with block bootstrap, the season guard; CLI `fansent react`.
-- Later: `skill_luck.py` (S2), `fanbase_rank.py` (S3 second stage + Q test), S4-S6 modules.
+- `src/fansent/schedule.py`: `fansent schedule` (first-pitch times).
+- `src/fansent/skill_luck.py` (S2), `fanbase_rank.py` (S3 second stage + heterogeneity
+  test), then S4-S6 modules.
 - Tests on the core logic: time-zone/cutoff assignment (DST edges, doubleheaders, r/baseball
   zone), linear weights, EB moments recovery, within estimator vs a dense dummy regression,
   OI = 0 on a synthetic rational fan and ~1 on a synthetic recency fan, the season guard.
 
-Private collector (`feat/backfill-seasons`): `xstats-download`; run scripts per season.
+Private collector (`feat/backfill-seasons`): `xstats-download`, `alias-sample` (item 3a);
+run scripts per season.
 
 ## Decisions recorded (owner, 2026-11-23)
 
@@ -303,26 +341,18 @@ Private collector (`feat/backfill-seasons`): `xstats-download`; run scripts per 
 - New data: Statcast expected stats via the private collector; no IL transactions.
 - S3 = discrimination + least overreaction combined, hierarchical partial pooling,
   heterogeneity test + tiers/credible intervals, classifier-reliability disattenuation.
-
-## Assumptions made in this draft (owner to confirm)
-
-- Backfill seasons 2023, 2024, 2025 (Arctic Shift covers them; the collector already
-  takes any date window; 2023 has the June protest blackout).
-- Fan-day cutoff 05:00 local; r/baseball uses the player's team zone.
-- Game value in runs (wRAA / runs saved) as the single performance scale.
-- Primary S1 estimand is OI (S1c); S1a/S1b are descriptive of timing.
-- Confirmatory primary = 2023-2025 pooled; per-season results secondary.
-- Tier rule (P >= 0.8 of top/bottom 10) and noisy-fanbase flag (sb_rel < 0.3).
+- Q1: every confirmatory claim must replicate in 2023, 2024 and 2025 individually; no
+  pooled test.
+- Q2: skill vs luck (dL) is primary in the knows-ball score, overreaction secondary; not
+  equal weight (2:1 in this draft, pending sign-off).
+- Q3: a small random sample of backfilled raw comment text may be read for alias
+  discovery, contained and logged as in item 3a; disclosed deviation.
+- Q4: OI controls for the team result; uncontrolled OI kept as secondary (F1s).
+- Q5: fetch schedule start times (done for 2023-2026); used in robustness R7.
+- Q6 (push the pre-registration for a public timestamp): held; owner decides later.
+- Assumptions accepted: backfill seasons 2023-2025, 05:00 cutoff, runs above average as
+  the performance scale, tier rule P >= 0.8, reliability floor sb_rel < 0.3.
 
 ## Open questions
 
-- Q1: Pool the three backfill seasons as the confirmatory test (more power), or require
-  replication in each season (stricter, much less power for S3)? Draft: pooled primary.
-- Q2: S3 combined score weights OI and dL equally. Equal, or primary = one index only?
-- Q3: Aliases for 2023-2025 rosters: build only from roster/public name data (clean, lower
-  recall), or allow reviewing a sample of backfilled mention text (higher recall, breaks
-  the "closed seasons" rule)? Draft: roster-only.
-- Q4: Hedonic vs evaluative sentiment: accept OI as defined, or add a game-outcome (team
-  win) control to S1c so OI measures reaction to the player's own surprise net of the
-  team result?
-- Q5: Fetch schedule start times (one request per season) to split pre/post first pitch?
+- The 2:1 weight in the knows-ball score (Q2 follow-up).

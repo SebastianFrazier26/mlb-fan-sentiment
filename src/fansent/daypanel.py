@@ -59,6 +59,7 @@ PITCH_KEYS = {
     "baseOnBalls": "bb",
     "hitByPitch": "hbp",
     "hits": "h",
+    "runs": "r",
 }
 GROUP_FILES = {"hitting": HIT_KEYS, "pitching": PITCH_KEYS}
 
@@ -195,6 +196,22 @@ def player_group(players: pd.DataFrame) -> pd.Series:
     return pd.Series(np.where(is_p, "pitching", "hitting"), index=players["player_id"].astype(str))
 
 
+def first_pitch(schedule: pd.DataFrame) -> pd.DataFrame:
+    """schedule.csv -> earliest first pitch (unix seconds) per (team_id, fan_day)."""
+    # Unit-free conversion: parsed timestamps may be us- or ns-resolution.
+    epoch = pd.Timestamp(0, tz="UTC")
+    t = (pd.to_datetime(schedule["game_utc"], utc=True) - epoch) // pd.Timedelta(seconds=1)
+    day = pd.to_datetime(schedule["official_date"])
+    both = pd.concat(
+        [
+            pd.DataFrame({"team_id": schedule["home_id"], "fan_day": day, "first_pitch_utc": t}),
+            pd.DataFrame({"team_id": schedule["away_id"], "fan_day": day, "first_pitch_utc": t}),
+        ]
+    )
+    both["team_id"] = both["team_id"].astype(int)
+    return both.groupby(["team_id", "fan_day"], as_index=False)["first_pitch_utc"].min()
+
+
 def mention_days(
     mentions: pd.DataFrame,
     player_teams: pd.DataFrame,
@@ -202,6 +219,7 @@ def mention_days(
     fanbase_teams: dict[str, frozenset[int]],
     cutoff_hour: int = 5,
     timezones: dict[int, str] | None = None,
+    pitch_times: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Kept Reddit mentions -> mean sentiment per (fanbase, player_id, fan_day).
 
@@ -209,7 +227,8 @@ def mention_days(
     player_teams: player_id, team_id, week_start (weekly 40-man rosters).
     Team fanbases keep only their own players, judged by the roster of the fan-day's Monday
     week; league-wide subs use the player's team that week for the time zone and are dropped
-    when the player is on no roster that week."""
+    when the player is on no roster that week. pitch_times (`first_pitch`) drops comments made
+    before the first pitch of the player's team on that fan-day (robustness R7)."""
     tz_of = timezones or load_team_timezones()
     df = mentions.copy()
     df["player_id"] = df["player_id"].astype(str)
@@ -242,6 +261,11 @@ def mention_days(
     own = df["team_id"] == df["fanbase"].str.lower().map(fb_team)
     df = df[~team_fb | own]
     df = df[df["team_id"].notna()]
+    if pitch_times is not None:
+        df = df.assign(team_id=df["team_id"].astype(int)).merge(
+            pitch_times, on=["team_id", "fan_day"], how="left"
+        )
+        df = df[~(df["created_utc"].astype("int64") < df["first_pitch_utc"])]
 
     g = df.groupby(["fanbase", "player_id", "fan_day"], sort=True)["compound"]
     out = g.agg(sent="mean", n_mentions="size").reset_index()

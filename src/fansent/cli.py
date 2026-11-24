@@ -273,6 +273,14 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--boot", type=int, default=199, help="Player-block bootstrap draws for OI")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--out", help="Output dir (default: <data-dir>/runs/<date>-react)")
+    p.add_argument(
+        "--drop-pregame",
+        action="store_true",
+        help="Drop comments before the team's first pitch that fan-day (needs schedule.csv)",
+    )
+
+    p = sub.add_parser("schedule", help="Fetch the season's final games -> schedule.csv")
+    p.add_argument("--season", type=int, default=2026)
 
     p = sub.add_parser(
         "power",
@@ -513,8 +521,13 @@ def main(argv: list[str] | None = None) -> None:
             args.boot,
             args.seed,
             Path(args.out) if args.out else None,
+            args.drop_pregame,
         )
         print(res.to_string(index=False))
+    elif args.command == "schedule":
+        from . import schedule
+
+        schedule.run(args.season, data_dir)
     elif args.command == "confirm":
         from . import confirm
 

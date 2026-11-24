@@ -26,6 +26,7 @@ from scipy.stats import norm
 from . import daypanel as dp
 from .multitest import benjamini_hochberg, holm
 from .panel import load_fanbase_teams, load_team_subreddits
+from .schedule import SCHEDULE_FILE
 from .util import (
     PLAYER_TEAMS_FILE,
     PLAYERS_FILE,
@@ -161,9 +162,13 @@ def fit_weekly_dl(wk: pd.DataFrame, n_lags: int, value: str = "vz") -> WLSResult
     )
 
 
-def fit_overreaction(panel: pd.DataFrame, n_lags: int) -> WLSResult:
-    """S1c: y_{j,d} on u and s lags 0..L plus played-flags and day of week."""
+def fit_overreaction(panel: pd.DataFrame, n_lags: int, control_win: bool = True) -> WLSResult:
+    """S1c: y_{j,d} on u and s lags 0..L plus played-flags and day of week. control_win adds
+    the team-won flags at each lag (owner decision 2026-11-23: the primary OI is net of the
+    team result; the uncontrolled one is secondary)."""
     cols = _lag_names(["u", "s"], n_lags) + [f"played_l{lag}" for lag in range(n_lags + 1)]
+    if control_win:
+        cols += [f"team_win_l{lag}" for lag in range(n_lags + 1)]
     X = np.column_stack([panel[cols].to_numpy(float), _dow(panel["fan_day"])])
     return within_wls(
         panel["sent"].to_numpy(),
@@ -184,7 +189,12 @@ def oi_from(res: WLSResult, n_lags: int, scale: float) -> tuple[float, float, fl
 
 
 def block_bootstrap_oi(
-    panel: pd.DataFrame, n_lags: int, scale: float, n_boot: int, seed: int
+    panel: pd.DataFrame,
+    n_lags: int,
+    scale: float,
+    n_boot: int,
+    seed: int,
+    control_win: bool = True,
 ) -> np.ndarray:
     """OI over player-block bootstrap resamples (the whole player history in every unit)."""
     rng = np.random.default_rng(seed)
@@ -203,7 +213,7 @@ def block_bootstrap_oi(
         rep_id = np.concatenate(units)
         sub["unit"] = sub["unit"].astype(str).to_numpy() + "#" + rep_id.astype(str)
         sub["player_id"] = sub["player_id"].astype(str).to_numpy() + "#" + rep_id.astype(str)
-        out[b] = oi_from(fit_overreaction(sub, n_lags), n_lags, scale)[0]
+        out[b] = oi_from(fit_overreaction(sub, n_lags, control_win), n_lags, scale)[0]
     return out
 
 
@@ -237,7 +247,7 @@ def load_inputs(data_dir: Path) -> dict[str, pd.DataFrame]:
 
 
 def build(
-    data_dir: Path, season: int, n_lags: int, cutoff_hour: int
+    data_dir: Path, season: int, n_lags: int, cutoff_hour: int, drop_pregame: bool = False
 ) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, dp.EBHyper], dict[str, float]]:
     """(day panel, week panel, EB hyperparameters and median pre-game exposure per group)."""
     inp = load_inputs(data_dir)
@@ -249,18 +259,23 @@ def build(
         hypers[gname] = dp.eb_hyper(g)
         g = dp.add_surprise(g, hypers[gname])
         g["vz"] = g["v"] / g["v"].std(ddof=0)
+        g["team_win"] = g["team_win"].astype(float)
         parts.append(g)
     games = pd.concat(parts, ignore_index=True)
+    pitch_times = None
+    if drop_pregame:
+        pitch_times = dp.first_pitch(pd.read_csv(data_dir / SCHEDULE_FILE))
     days = dp.mention_days(
         inp["mentions"],
         inp["player_teams"],
         load_team_subreddits(),
         load_fanbase_teams(),
         cutoff_hour,
+        pitch_times=pitch_times,
     )
     days["group"] = days["player_id"].map(group)
     days = days[days["group"].notna()]
-    panel = dp.daily_lags(games, days, ["vz", "u", "s"], n_lags)
+    panel = dp.daily_lags(games, days, ["vz", "u", "s", "team_win"], n_lags)
     panel["unit"] = panel["fanbase"] + "|" + panel["player_id"]
     wk = dp.weekly(days, games, ["vz"], 3)
     wk["group"] = wk["player_id"].map(group)
@@ -278,9 +293,10 @@ def run(
     n_boot: int = 199,
     seed: int = 0,
     out_dir: Path | None = None,
+    drop_pregame: bool = False,
 ) -> pd.DataFrame:
     require_open_season(season, prereg)
-    panel, wk, hypers, n_med = build(data_dir, season, n_lags, cutoff_hour)
+    panel, wk, hypers, n_med = build(data_dir, season, n_lags, cutoff_hour, drop_pregame)
     out_dir = out_dir or data_dir / "runs" / f"{dt.datetime.now(dt.UTC).date()}-react"
     out_dir.mkdir(parents=True, exist_ok=True)
     rows, coef_tables = [], []
@@ -318,15 +334,21 @@ def run(
         res = fit_weekly_dl(sub, 3)
         coef_tables.append(res.table().assign(analysis=f"A3-{grp}"))
         add("A3", f"{grp} B_3", *_sum_stat(res, [f"vz_l{lag}" for lag in range(4)]), res.n_obs)
-    for aid, mask, label in (("A4", team, "team subs"), ("A5", ~team, "r/baseball")):
+    oi_specs = [
+        ("A4", team, "team subs", True),
+        ("A5", ~team, "r/baseball", True),
+        ("A4u", team, "team subs, no win control", False),
+        ("A5u", ~team, "r/baseball, no win control", False),
+    ]
+    for aid, mask, label, control in oi_specs:
         for grp in ("hitting", "pitching"):
             sub = panel[mask & (panel["group"] == grp)]
             h = hypers[grp]
             scale = n_med[grp] + h.k
-            res = fit_overreaction(sub, n_lags)
+            res = fit_overreaction(sub, n_lags, control)
             coef_tables.append(res.table().assign(analysis=f"{aid}-{grp}"))
             oi, b_u, b_s = oi_from(res, n_lags, scale)
-            boot = block_bootstrap_oi(sub, n_lags, scale, n_boot, seed) if n_boot else None
+            boot = block_bootstrap_oi(sub, n_lags, scale, n_boot, seed, control) if n_boot else None
             se = float(np.nanstd(boot, ddof=1)) if boot is not None else float("nan")
             lo, hi = (
                 np.nanquantile(boot, [0.025, 0.975])
@@ -355,10 +377,15 @@ def run(
             rows[-1]["z"] = b_s / bs_se
             rows[-1]["p_test"] = float(2 * norm.sf(abs(b_s / bs_se)))
     res_df = pd.DataFrame(rows)
-    p = res_df["p_test"].to_numpy(float)
-    res_df["q_bh"] = benjamini_hochberg(p)
-    res_df["p_holm"] = holm(p)
-    res_df["family"] = "F1"
+    # Uncontrolled OI rows are the secondary analysis: their own BH family, so they neither
+    # dilute nor borrow from the primary F1 tests.
+    res_df["family"] = np.where(res_df["analysis"].str.endswith("u"), "F1s", "F1")
+    res_df["q_bh"] = np.nan
+    res_df["p_holm"] = np.nan
+    for idx in res_df.groupby("family").groups.values():
+        p = res_df.loc[idx, "p_test"].to_numpy(float)
+        res_df.loc[idx, "q_bh"] = benjamini_hochberg(p)
+        res_df.loc[idx, "p_holm"] = holm(p)
     res_df.to_csv(out_dir / "s1_results.csv", index=False)
     pd.concat(coef_tables).to_csv(out_dir / "s1_coefficients.csv", index=False)
     hyper_rows = [
@@ -370,6 +397,7 @@ def run(
         "season": season,
         "n_lags": n_lags,
         "cutoff_hour": cutoff_hour,
+        "drop_pregame": drop_pregame,
         "n_boot": n_boot,
         "seed": seed,
         "day_rows": len(panel),

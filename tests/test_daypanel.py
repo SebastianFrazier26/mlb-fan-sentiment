@@ -207,3 +207,33 @@ def test_weekly_aggregates_and_lags():
     w = dp.weekly(days, games, ["v"], 1).iloc[0]
     assert w["sent"] == pytest.approx(0.25)
     assert (w["v_l0"], w["v_l1"], w["n_l1"]) == (2.0, 1.0, 4.0)
+
+
+def test_first_pitch_and_pregame_drop():
+    sched = pd.DataFrame(
+        {
+            "official_date": ["2026-06-24", "2026-06-24"],
+            "game_utc": ["2026-06-24T23:05:00Z", "2026-06-24T17:05:00Z"],
+            "home_id": [112, 112],
+            "away_id": [138, 138],
+        }
+    )
+    fp = dp.first_pitch(sched)
+    assert len(fp) == 2
+    assert fp["first_pitch_utc"].iloc[0] == int(
+        pd.Timestamp("2026-06-24 17:05", tz="UTC").timestamp()
+    )
+    pt = pd.DataFrame({"player_id": ["7"], "team_id": [112], "week_start": ["2026-06-22"]})
+    m = pd.DataFrame(
+        {
+            "text_id": ["a", "b"],
+            "subreddit": ["CHICubs", "CHICubs"],
+            "player_id": ["7", "7"],
+            "created_utc": _utc(["2026-06-24 15:00", "2026-06-24 19:00"]),
+            "compound": [1.0, -1.0],
+        }
+    )
+    sub_fb, fb_teams = {"chicubs": "CHICubs"}, {"chicubs": frozenset({112})}
+    assert dp.mention_days(m, pt, sub_fb, fb_teams)["n_mentions"].sum() == 2
+    out = dp.mention_days(m, pt, sub_fb, fb_teams, pitch_times=fp)
+    assert out["n_mentions"].tolist() == [1] and out["sent"].tolist() == [-1.0]
