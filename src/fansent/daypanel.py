@@ -220,6 +220,7 @@ def mention_days(
     cutoff_hour: int = 5,
     timezones: dict[int, str] | None = None,
     pitch_times: pd.DataFrame | None = None,
+    aggregate: bool = True,
 ) -> pd.DataFrame:
     """Kept Reddit mentions -> mean sentiment per (fanbase, player_id, fan_day).
 
@@ -267,6 +268,8 @@ def mention_days(
         )
         df = df[~(df["created_utc"].astype("int64") < df["first_pitch_utc"])]
 
+    if not aggregate:
+        return df[["fanbase", "player_id", "fan_day", "compound"]].reset_index(drop=True)
     g = df.groupby(["fanbase", "player_id", "fan_day"], sort=True)["compound"]
     out = g.agg(sent="mean", n_mentions="size").reset_index()
     team = df.groupby(["fanbase", "player_id", "fan_day"], sort=True)["team_id"].last()

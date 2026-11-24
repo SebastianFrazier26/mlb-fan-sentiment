@@ -146,6 +146,28 @@ def rank_summary(values: np.ndarray, names: list[str], higher_better: bool) -> p
 
 
 MIN_PLAYERS = 10
+RELIABILITY_FLOOR = 0.3
+
+
+def split_half_reliability(mentions: pd.DataFrame, seed: int = 0, min_half: int = 3) -> pd.Series:
+    """Per fanbase: Spearman-Brown reliability of weekly mean sentiment from a random half
+    split of each player-week's mentions, after removing each unit's mean (the within-unit
+    signal the S1-S3 models use)."""
+    rng = np.random.default_rng(seed)
+    m = mentions.assign(
+        week=mentions["fan_day"] - pd.to_timedelta(mentions["fan_day"].dt.weekday, unit="D"),
+        half=rng.integers(0, 2, len(mentions)),
+    )
+    g = m.groupby(["fanbase", "player_id", "week", "half"])["compound"].agg(["mean", "size"])
+    g = g.unstack("half")
+    g = g[(g[("size", 0)] >= min_half) & (g[("size", 1)] >= min_half)]
+    d = pd.DataFrame({"a": g[("mean", 0)], "b": g[("mean", 1)]}).reset_index()
+    for c in "ab":
+        d[c] -= d.groupby(["fanbase", "player_id"])[c].transform("mean")
+    r = d.groupby("fanbase").apply(
+        lambda x: np.corrcoef(x["a"], x["b"])[0, 1], include_groups=False
+    )
+    return 2 * r / (1 + r)
 
 
 def _combine(per_group: dict[str, pd.Series], counts: dict[str, pd.Series]) -> pd.Series:
@@ -293,6 +315,13 @@ def run(
                 }
             )
         )
+    from . import daypanel as dp
+    from .panel import load_fanbase_teams as _lft
+    from .panel import load_team_subreddits as _lts
+
+    inp = reaction.load_inputs(data_dir)
+    ment = dp.mention_days(inp["mentions"], inp["player_teams"], _lts(), _lft(), 5, aggregate=False)
+    rel = split_half_reliability(ment[ment["fanbase"] != reaction.LEAGUE_FANBASE], seed)
     res = pd.DataFrame(tests)
     res["family"] = "F3"
     res["q_bh"] = benjamini_hochberg(res["p_perm"].to_numpy())
@@ -300,6 +329,8 @@ def run(
     common = sorted(set(theta["dL"].columns) & set(theta["OI"].columns))
     c = score_draws({k: theta[k][common].to_numpy() for k in SCORE_WEIGHTS})
     ranks = rank_summary(c, common, higher_better=True).assign(index="knows_ball")
+    ranks["sb_rel"] = ranks["fanbase"].map(rel)
+    ranks["too_noisy"] = ranks["sb_rel"] < RELIABILITY_FLOOR
     ranks_dl = rank_summary(theta["dL"].to_numpy(), list(theta["dL"].columns), False)
     res.to_csv(out_dir / "s3_tests.csv", index=False)
     pd.concat(est_tables).to_csv(out_dir / "s3_fanbase_estimates.csv", index=False)

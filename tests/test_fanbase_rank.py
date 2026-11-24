@@ -71,3 +71,24 @@ def test_rank_summary_and_score():
     oi = np.tile(np.array([2.0, 1.0, 0.0]), (5, 1))
     c = fr.score_draws({"dL": dl, "OI": oi})
     assert c[0].argmax() == 0  # dL is primary: low dL wins against high OI
+
+
+def test_split_half_reliability_high_for_signal_low_for_noise():
+    rng = np.random.default_rng(0)
+    rows = []
+    for fb, signal in (("sig", 1.0), ("noise", 0.0)):
+        for p in range(20):
+            for w in range(10):
+                level = signal * rng.normal()
+                day = pd.Timestamp("2026-04-06") + pd.Timedelta(weeks=w)
+                for _ in range(12):
+                    rows.append(
+                        {
+                            "fanbase": fb,
+                            "player_id": str(p),
+                            "fan_day": day,
+                            "compound": level + rng.normal(0, 0.5),
+                        }
+                    )
+    rel = fr.split_half_reliability(pd.DataFrame(rows))
+    assert rel["sig"] > 0.8 and abs(rel["noise"]) < 0.3
